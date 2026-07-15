@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+
+<!DOCTYPE html>
+
+<html lang="es-CO">
+<head>
+<meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/>
+<title>StockÁgil Pro | Plataforma Empresarial</title>
+
+
+<link href="styles.css" rel="stylesheet"/></head>
+<body>
+<section class="login" id="login">
+<div class="login-art"><div class="login-brand"><div class="logo">🛒</div><div><b style="font-size:22px">StockÁgil Pro</b><div style="opacity:.65">Operación inteligente para supermercados</div></div></div><div class="login-copy"><h1>Control total.<br/>Decisiones rápidas.</h1><p>Ventas, inventario, facturación, sucursales, transferencias, usuarios, alertas y auditoría en una sola plataforma.</p></div><div class="login-features"><div><b>Multi-sucursal</b><span>Stock consolidado y transferencias.</span></div><div><b>POS profesional</b><span>Caja, pagos, facturas y turnos.</span></div><div><b>Seguridad</b><span>Roles, permisos y auditoría.</span></div></div></div>
+<div class="login-side"><div class="login-card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px"><div><h2>Bienvenido</h2><p>Ingrese a su espacio de trabajo.</p></div><div class="logo" style="width:48px;height:48px;font-size:17px">SÁ</div></div><form id="loginForm"><div class="field"><label>Usuario</label><input autocomplete="username" id="loginUser" placeholder="Ingrese su usuario" required=""/></div><div class="field"><label>Contraseña</label><input autocomplete="current-password" id="loginPass" placeholder="Ingrese su contraseña" required="" type="password"/></div><button class="btn primary full" style="padding:13px">Iniciar sesión</button></form><div class="demo"><b>Accesos de demostración</b><div class="demo-row"><span>Administrador</span><code>admin / admin123</code></div><div class="demo-row"><span>Cajero</span><code>cajero / caja123</code></div><div class="demo-row"><span>Bodega</span><code>bodega / bodega123</code></div><div class="demo-row"><span>Supervisor</span><code>supervisor / super123</code></div></div></div></div>
+</section>
+<div class="loader" id="loader"><div style="text-align:center"><div class="ring"></div><h2 id="loaderText">Preparando su espacio de trabajo</h2><p style="opacity:.7">Sincronizando permisos, sucursal y alertas</p></div></div>
+<div class="app hidden" id="app">
+<aside class="sidebar" id="sidebar"><div class="brand"><div class="logo" style="width:46px;height:46px;font-size:16px">🛒</div><div><h1>StockÁgil Pro</h1><small>Plataforma empresarial</small></div></div><div class="store-select"><label>Sucursal de trabajo</label><select id="storeSelect"></select></div><div class="nav" id="nav"></div><div class="session"><div class="session-top"><div class="avatar" id="avatar">AD</div><div><strong id="sessionName"></strong><small id="sessionRole"></small></div></div><div class="session-state"><span><i class="dot" id="stateDot"></i><span id="sessionStatus">Activo</span></span><span id="clock"></span></div><div class="session-actions"><button class="btn sm warn" onclick="quickPause()">Pausar</button><button class="btn sm danger" onclick="logout()">Salir</button></div></div></aside>
+<main class="main"><header class="topbar"><div class="page-title"><h2 id="pageTitle">Resumen</h2><p id="pageSubtitle">Vista general de la operación</p></div><div class="top-actions"><button class="btn outline" onclick="toggleSidebar()">☰</button><button class="btn outline" onclick="go('alerts')">🔔 <span id="alertTop">0</span></button><button class="btn primary" onclick="go('pos')">＋ Nueva venta</button></div></header><div class="content" id="content"></div></main>
+</div>
+<div class="modalback" id="modalBack"><div class="modal" id="modal"><div class="modalhead"><h3 id="modalTitle"></h3><button class="btn light sm" onclick="closeModal()">✕</button></div><div class="modalbody" id="modalBody"></div></div></div><div class="toast" id="toast"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+<script src="app.js"></script></body></html>
