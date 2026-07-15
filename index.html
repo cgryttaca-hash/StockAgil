@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="es-CO">
+  <head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width,initial-scale=1" name="viewport" />
+    <meta name="theme-color" content="#056c54" />
+    <meta
+      name="description"
+      content="StockÁgil Pro - gestión integral de supermercados"
+    />
+    <title>Stock&Aacute;gil Pro | Plataforma Empresarial</title>
+    <link href="./assets/css/styles.css" rel="stylesheet" />
+  </head>
+  <body>
+    <section class="login" id="login">
+      <div class="login-art">
+        <div class="login-brand">
+          <div class="logo">🛒</div>
+          <div>
+            <b style="font-size: 22px"> Stock&Aacute;gil Pro </b>
+            <div style="opacity: 0.65">
+              Operaci&oacute;n inteligente para supermercados
+            </div>
+          </div>
+        </div>
+        <div class="login-copy">
+          <h1>
+            Control total.
+            <br />
+            Decisiones r&aacute;pidas.
+          </h1>
+          <p>
+            Ventas, inventario, facturaci&oacute;n, sucursales, transferencias,
+            usuarios, alertas y auditor&iacute;a en una sola plataforma.
+          </p>
+        </div>
+        <div class="login-features">
+          <div>
+            <b> Multi-sucursal </b>
+            <span> Stock consolidado y transferencias. </span>
+          </div>
+          <div>
+            <b> POS profesional </b>
+            <span> Caja, pagos, facturas y turnos. </span>
+          </div>
+          <div>
+            <b> Seguridad </b>
+            <span> Roles, permisos y auditor&iacute;a. </span>
+          </div>
+        </div>
+      </div>
+      <div class="login-side">
+        <div class="login-card">
+          <div
+            style="
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              margin-bottom: 18px;
+            "
+          >
+            <div>
+              <h2>Bienvenido</h2>
+              <p>Ingrese a su espacio de trabajo.</p>
+            </div>
+            <div
+              class="logo"
+              style="width: 48px; height: 48px; font-size: 17px"
+            >
+              S&Aacute;
+            </div>
+          </div>
+          <form id="loginForm">
+            <div class="field">
+              <label> Usuario </label>
+              <input
+                autocomplete="username"
+                id="loginUser"
+                placeholder="Ingrese su usuario"
+                required=""
+              />
+            </div>
+            <div class="field">
+              <label> Contrase&ntilde;a </label>
+              <input
+                autocomplete="current-password"
+                id="loginPass"
+                placeholder="Ingrese su contrase&ntilde;a"
+                required=""
+                type="password"
+              />
+            </div>
+            <button class="btn primary full" style="padding: 13px">
+              Iniciar sesi&oacute;n
+            </button>
+          </form>
+          <div class="demo">
+            <b> Accesos de demostraci&oacute;n </b>
+            <div class="demo-row">
+              <span> Administrador </span>
+              <code> admin / admin123 </code>
+            </div>
+            <div class="demo-row">
+              <span> Cajero </span>
+              <code> cajero / caja123 </code>
+            </div>
+            <div class="demo-row">
+              <span> Bodega </span>
+              <code> bodega / bodega123 </code>
+            </div>
+            <div class="demo-row">
+              <span> Supervisor </span>
+              <code> supervisor / super123 </code>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+    <div class="loader" id="loader">
+      <div style="text-align: center">
+        <div class="ring"></div>
+        <h2 id="loaderText">Preparando su espacio de trabajo</h2>
+        <p style="opacity: 0.7">Sincronizando permisos, sucursal y alertas</p>
+      </div>
+    </div>
+    <div class="app hidden" id="app">
+      <aside class="sidebar" id="sidebar">
+        <div class="brand">
+          <div class="logo" style="width: 46px; height: 46px; font-size: 16px">
+            🛒
+          </div>
+          <div>
+            <h1>Stock&Aacute;gil Pro</h1>
+            <small> Plataforma empresarial </small>
+          </div>
+        </div>
+        <div class="store-select">
+          <label> Sucursal de trabajo </label>
+          <select id="storeSelect"></select>
+        </div>
+        <div class="nav" id="nav"></div>
+        <div class="session">
+          <div class="session-top">
+            <div class="avatar" id="avatar">AD</div>
+            <div>
+              <strong id="sessionName"> </strong>
+              <small id="sessionRole"> </small>
+            </div>
+          </div>
+          <div class="session-state">
+            <span>
+              <i class="dot" id="stateDot"> </i>
+              <span id="sessionStatus"> Activo </span>
+            </span>
+            <span id="clock"> </span>
+          </div>
+          <div class="session-actions">
+            <button class="btn sm warn" onclick="quickPause()">Pausar</button>
+            <button class="btn sm danger" onclick="logout()">Salir</button>
+          </div>
+        </div>
+      </aside>
+      <main class="main">
+        <header class="topbar">
+          <div class="page-title">
+            <h2 id="pageTitle">Resumen</h2>
+            <p id="pageSubtitle">Vista general de la operaci&oacute;n</p>
+          </div>
+          <div class="top-actions">
+            <button class="btn outline" onclick="toggleSidebar()">☰</button>
+            <button class="btn outline" onclick="go('alerts')">
+              🔔
+              <span id="alertTop"> 0 </span>
+            </button>
+            <button class="btn primary" onclick="go('pos')">
+              ＋ Nueva venta
+            </button>
+          </div>
+        </header>
+        <div class="content" id="content"></div>
+      </main>
+    </div>
+    <div class="modalback" id="modalBack">
+      <div class="modal" id="modal">
+        <div class="modalhead">
+          <h3 id="modalTitle"></h3>
+          <button class="btn light sm" onclick="closeModal()">✕</button>
+        </div>
+        <div class="modalbody" id="modalBody"></div>
+      </div>
+    </div>
+    <div class="toast" id="toast"></div>
+    <script>
+      window.addEventListener("error", function (event) {
+        const panel =
+          document.getElementById("fatalErrorPanel") ||
+          document.createElement("div");
+        panel.id = "fatalErrorPanel";
+        panel.style.cssText =
+          "position:fixed;left:16px;right:16px;bottom:16px;z-index:99999;background:#7f1d1d;color:#fff;padding:14px 16px;border-radius:12px;font:14px system-ui;box-shadow:0 12px 40px #0005";
+        panel.innerHTML =
+          "<strong>Error al cargar StockÁgil:</strong> " +
+          (event.message || "Error desconocido") +
+          "<br><small>Compruebe que index.html y la carpeta assets se subieron completos.</small>";
+        document.body.appendChild(panel);
+      });
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="./assets/js/app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,2167 @@
+const $ = (s) => document.querySelector(s),
+  uid = (p) => p + "_" + Math.random().toString(36).slice(2, 10),
+  now = () => new Date().toISOString(),
+  today = () => new Date().toISOString().slice(0, 10),
+  money = (n) =>
+    new Intl.NumberFormat("es-CO", {
+      style: "currency",
+      currency: "COP",
+      maximumFractionDigits: 0,
+    }).format(Number(n || 0));
+const MODULES = {
+  dashboard: ["Resumen", "Panel ejecutivo"],
+  pos: ["Ventas POS", "Facturación y caja"],
+  invoices: ["Facturas", "Consulta e impresión"],
+  products: ["Productos", "Maestro, EAN y QR"],
+  movements: ["Movimientos", "Entradas, salidas y ajustes"],
+  alerts: ["Alertas", "Stock, vencimientos y riesgos"],
+  transfers: ["Transferencias", "Solicitudes entre sedes"],
+  branches: ["Sucursales", "Administración multi-sede"],
+  users: ["Usuarios", "Roles y permisos"],
+  cash: ["Caja y turnos", "Apertura, pausas y cierre"],
+  reports: ["Reportes", "Ventas, pagos e inventario"],
+  audit: ["Auditoría", "Diferencias y posibles pérdidas"],
+  settings: ["Configuración", "Empresa y respaldos"],
+};
+const ACTIONS = [
+  "view",
+  "create",
+  "edit",
+  "delete",
+  "approve",
+  "export",
+  "print",
+  "manage",
+];
+const defaultPerms = {
+  Administrador: Object.keys(MODULES),
+  Supervisor: [
+    "dashboard",
+    "invoices",
+    "products",
+    "movements",
+    "alerts",
+    "transfers",
+    "branches",
+    "cash",
+    "reports",
+    "audit",
+  ],
+  Cajero: ["dashboard", "pos", "invoices", "alerts", "cash"],
+  Bodega: [
+    "dashboard",
+    "products",
+    "movements",
+    "alerts",
+    "transfers",
+    "audit",
+  ],
+};
+function seed() {
+  let stores = [
+    {
+      id: "s1",
+      name: "El Progreso Centro",
+      city: "Bogotá",
+      address: "Cra. 18 # 42-15",
+      active: true,
+    },
+    {
+      id: "s2",
+      name: "El Progreso Norte",
+      city: "Bogotá",
+      address: "Calle 140 # 16-30",
+      active: true,
+    },
+    {
+      id: "s3",
+      name: "El Progreso Soacha",
+      city: "Soacha",
+      address: "Cra. 7 # 18-22",
+      active: true,
+    },
+  ];
+  let base = [
+    [
+      "7702001050316",
+      "Arroz Diana 1 kg",
+      "Granos",
+      5200,
+      3950,
+      18,
+      8,
+      "https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&w=500&q=70",
+    ],
+    [
+      "7702025142646",
+      "Leche Alquería 1 L",
+      "Lácteos",
+      4200,
+      3300,
+      5,
+      8,
+      "https://images.unsplash.com/photo-1550583724-b2692b85b150?auto=format&fit=crop&w=500&q=70",
+    ],
+    [
+      "7702084123459",
+      "Huevos AA x 30",
+      "Huevos",
+      18500,
+      15000,
+      0,
+      4,
+      "https://images.unsplash.com/photo-1506976785307-8732e854ad03?auto=format&fit=crop&w=500&q=70",
+    ],
+    [
+      "7702011001237",
+      "Aceite Premier 1 L",
+      "Aceites",
+      10900,
+      8900,
+      9,
+      5,
+      "https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?auto=format&fit=crop&w=500&q=70",
+    ],
+    [
+      "7702129008887",
+      "Café Sello Rojo 500 g",
+      "Bebidas",
+      14900,
+      11900,
+      4,
+      6,
+      "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=500&q=70",
+    ],
+    [
+      "7702007154001",
+      "Gaseosa Colombiana 1.5 L",
+      "Bebidas",
+      6900,
+      5100,
+      22,
+      10,
+      "https://images.unsplash.com/photo-1629203851122-3726ecdf080e?auto=format&fit=crop&w=500&q=70",
+    ],
+    [
+      "7702047009900",
+      "Pan tajado Bimbo",
+      "Panadería",
+      7200,
+      5600,
+      2,
+      5,
+      "https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=500&q=70",
+    ],
+    [
+      "7702145002210",
+      "Jabón Rey 300 g",
+      "Aseo",
+      3900,
+      2800,
+      14,
+      6,
+      "https://images.unsplash.com/photo-1584305574647-0cc949a2bb9f?auto=format&fit=crop&w=500&q=70",
+    ],
+  ];
+  let products = [];
+  stores.forEach((s, si) =>
+    base.forEach((p, i) =>
+      products.push({
+        id: `p${si}${i}`,
+        store: s.id,
+        ean: p[0],
+        code: `${["SEC", "LAC", "HUE", "ACE", "CAF", "BEB", "PAN", "ASE"][i]}-${String(i + 1).padStart(3, "0")}`,
+        name: p[1],
+        category: p[2],
+        price: p[3],
+        buy: p[4],
+        stock: Math.max(0, p[5] + si * 3 - (i % 3)),
+        min: p[6],
+        tax: i % 3 === 0 ? 0 : i % 3 === 1 ? 5 : 19,
+        image: p[7],
+        expiry:
+          i === 1 || i === 6
+            ? new Date(Date.now() + (i + 3) * 86400000)
+                .toISOString()
+                .slice(0, 10)
+            : "",
+        active: true,
+      }),
+    ),
+  );
+  let users = [
+    {
+      id: "u1",
+      name: "Administrador General",
+      username: "admin",
+      password: "admin123",
+      role: "Administrador",
+      store: "s1",
+      active: true,
+      branches: ["s1", "s2", "s3"],
+      permissions: Object.keys(MODULES),
+      actions: Object.fromEntries(
+        Object.keys(MODULES).map((m) => [m, [...ACTIONS]]),
+      ),
+      createdBy: "Sistema",
+    },
+    {
+      id: "u2",
+      name: "Laura Cajera",
+      username: "cajero",
+      password: "caja123",
+      role: "Cajero",
+      store: "s1",
+      active: true,
+      branches: ["s1"],
+      permissions: defaultPerms.Cajero,
+      actions: {
+        pos: ["view", "create", "print"],
+        invoices: ["view", "print"],
+        alerts: ["view"],
+        cash: ["view", "create"],
+        dashboard: ["view"],
+      },
+      createdBy: "Administrador General",
+    },
+    {
+      id: "u3",
+      name: "Carlos Bodega",
+      username: "bodega",
+      password: "bodega123",
+      role: "Bodega",
+      store: "s1",
+      active: true,
+      branches: ["s1", "s2"],
+      permissions: defaultPerms.Bodega,
+      actions: {
+        products: ["view", "create", "edit", "print"],
+        movements: ["view", "create"],
+        alerts: ["view"],
+        transfers: ["view", "create"],
+        audit: ["view", "create"],
+        dashboard: ["view"],
+      },
+      createdBy: "Administrador General",
+    },
+    {
+      id: "u4",
+      name: "Diana Supervisora",
+      username: "supervisor",
+      password: "super123",
+      role: "Supervisor",
+      store: "s2",
+      active: true,
+      branches: ["s1", "s2", "s3"],
+      permissions: defaultPerms.Supervisor,
+      actions: Object.fromEntries(
+        defaultPerms.Supervisor.map((m) => [
+          m,
+          ["view", "create", "edit", "approve", "export", "print"],
+        ]),
+      ),
+      createdBy: "Administrador General",
+    },
+  ];
+  return {
+    version: 8,
+    settings: {
+      name: "Supermercados El Progreso",
+      nit: "901.456.789-2",
+      phone: "601 555 0198",
+      email: "facturacion@elprogreso.co",
+      address: "Bogotá D.C.",
+      invoicePrefix: "FEP",
+      nextInvoice: 1001,
+    },
+    stores,
+    users,
+    products,
+    sales: [],
+    invoices: [],
+    movements: [],
+    transfers: [],
+    cashSessions: [],
+    audit: [],
+    alertsRead: [],
+    currentUser: null,
+    currentStore: "s1",
+    cart: [],
+    sessionState: "Activo",
+    lastBackup: null,
+  };
+}
+let db = JSON.parse(localStorage.getItem("stockagil_v8") || "null") || seed();
+function save() {
+  localStorage.setItem("stockagil_v8", JSON.stringify(db));
+}
+function user() {
+  return db.users.find((u) => u.id === db.currentUser);
+}
+function store() {
+  return db.stores.find((s) => s.id === db.currentStore);
+}
+function can(m, a = "view") {
+  let u = user();
+  return (
+    !!u &&
+    u.active &&
+    u.permissions.includes(m) &&
+    (u.role === "Administrador" || (u.actions[m] || []).includes(a))
+  );
+}
+function allowedStore(id) {
+  let u = user();
+  return u && u.branches.includes(id);
+}
+function toast(t) {
+  let x = $("#toast");
+  x.textContent = t;
+  x.classList.add("show");
+  setTimeout(() => x.classList.remove("show"), 2600);
+}
+function login(e) {
+  e.preventDefault();
+  let un = $("#loginUser").value.trim().toLowerCase(),
+    pw = $("#loginPass").value,
+    u = db.users.find(
+      (x) => x.username.toLowerCase() === un && x.password === pw,
+    );
+  if (!u) return toast("Usuario o contraseña incorrectos");
+  if (!u.active) return toast("Este usuario está bloqueado");
+  db.currentUser = u.id;
+  db.currentStore = u.branches.includes(u.store) ? u.store : u.branches[0];
+  db.sessionState = "Activo";
+  save();
+  $("#loaderText").textContent = `Bienvenido, ${u.name}`;
+  $("#loader").classList.add("show");
+  setTimeout(() => {
+    $("#loader").classList.remove("show");
+    showApp();
+  }, 1000);
+}
+$("#loginForm").addEventListener("submit", login);
+function logout() {
+  db.currentUser = null;
+  db.cart = [];
+  save();
+  $("#app").classList.add("hidden");
+  $("#login").classList.remove("hidden");
+  toast("Sesión cerrada correctamente");
+}
+function showApp() {
+  $("#login").classList.add("hidden");
+  $("#app").classList.remove("hidden");
+  renderShell();
+  go("dashboard");
+}
+function renderShell() {
+  let u = user();
+  $("#sessionName").textContent = u.name;
+  $("#sessionRole").textContent = u.role;
+  $("#avatar").textContent = u.name
+    .split(" ")
+    .map((x) => x[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+  $("#storeSelect").innerHTML = u.branches
+    .filter((id) => db.stores.some((s) => s.id === id && s.active))
+    .map((id) => {
+      let s = db.stores.find((x) => x.id === id);
+      return `<option value="${id}" ${id === db.currentStore ? "selected" : ""}>${s.name}</option>`;
+    })
+    .join("");
+  $("#storeSelect").onchange = (e) => {
+    db.currentStore = e.target.value;
+    save();
+    go("dashboard");
+  };
+  renderNav();
+  updateSession();
+}
+function renderNav() {
+  let u = user(),
+    groups = [
+      ["OPERACIÓN", ["dashboard", "pos", "invoices", "cash"]],
+      ["INVENTARIO", ["products", "movements", "alerts", "transfers"]],
+      ["GESTIÓN", ["branches", "users", "reports", "audit", "settings"]],
+    ];
+  $("#nav").innerHTML = groups
+    .map(
+      (g) =>
+        `<div class="nav-title">${g[0]}</div>${g[1]
+          .filter((m) => u.permissions.includes(m))
+          .map(
+            (m) =>
+              `<button data-go="${m}" onclick="go('${m}')"><span class="ico">${{ dashboard: "⌂", pos: "▣", invoices: "▤", cash: "◷", products: "□", movements: "⇄", alerts: "!", transfers: "⇆", branches: "⌘", users: "♙", reports: "▥", audit: "⚠", settings: "⚙" }[m]}</span>${MODULES[m][0]}${m === "alerts" ? `<span class="count">${getAlerts().length}</span>` : ""}</button>`,
+          )
+          .join("")}`,
+    )
+    .join("");
+}
+function go(m) {
+  if (!can(m)) return toast("No tiene permiso para abrir este módulo");
+  document
+    .querySelectorAll("[data-go]")
+    .forEach((b) => b.classList.toggle("active", b.dataset.go === m));
+  $("#pageTitle").textContent = MODULES[m][0];
+  $("#pageSubtitle").textContent = MODULES[m][1];
+  render(m);
+  if (innerWidth < 900) $("#sidebar").classList.remove("open");
+}
+function render(m) {
+  let fn = {
+    dashboard: renderDashboard,
+    pos: renderPOS,
+    invoices: renderInvoices,
+    products: renderProducts,
+    movements: renderMovements,
+    alerts: renderAlerts,
+    transfers: renderTransfers,
+    branches: renderBranches,
+    users: renderUsers,
+    cash: renderCash,
+    reports: renderReports,
+    audit: renderAudit,
+    settings: renderSettings,
+  }[m];
+  fn && fn();
+}
+function getProducts(storeId = db.currentStore) {
+  return db.products.filter((p) => p.store === storeId && p.active);
+}
+function getSales(storeId = db.currentStore) {
+  return db.sales.filter((s) => s.store === storeId);
+}
+function getAlerts() {
+  let arr = [];
+  getProducts().forEach((p) => {
+    if (p.stock === 0)
+      arr.push({ type: "danger", title: "Producto agotado", text: p.name });
+    else if (p.stock <= p.min)
+      arr.push({
+        type: "warning",
+        title: "Stock bajo",
+        text: `${p.name}: ${p.stock} unidades`,
+      });
+    if (p.expiry) {
+      let d = (new Date(p.expiry) - new Date()) / 86400000;
+      if (d >= 0 && d <= 7)
+        arr.push({
+          type: "warning",
+          title: "Próximo a vencer",
+          text: `${p.name}: ${Math.ceil(d)} días`,
+        });
+    }
+  });
+  db.audit
+    .filter(
+      (a) => a.store === db.currentStore && a.risk === "Alto" && !a.resolved,
+    )
+    .forEach((a) =>
+      arr.push({
+        type: "danger",
+        title: "Diferencia sospechosa",
+        text: `${a.productName}: ${a.diff} unidades`,
+      }),
+    );
+  return arr;
+}
+function stat(v, k, s) {
+  return `<div class="card stat"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${s}</div></div>`;
+}
+function renderDashboard() {
+  let ps = getProducts(),
+    ss = getSales(),
+    tod = ss.filter((s) => s.date.slice(0, 10) === today()),
+    rev = tod.reduce((a, s) => a + s.total, 0),
+    low = ps.filter((p) => p.stock <= p.min).length,
+    inv = ps.reduce((a, p) => a + p.stock * p.buy, 0),
+    pending = db.transfers.filter(
+      (t) => t.to === db.currentStore && t.status === "Pendiente",
+    ).length,
+    risks = db.audit.filter(
+      (a) => a.store === db.currentStore && !a.resolved && a.risk === "Alto",
+    ).length;
+  $("#content").innerHTML =
+    `<div class="hero"><div><h3>${store().name}</h3><p>${store().city} · Operación consolidada en tiempo real</p></div><div style="text-align:right"><span>Ventas de hoy</span><b>${money(rev)}</b></div></div><div class="grid stats">${stat(ps.length, "Productos activos", "Catálogo de sede")}${stat(low, "Alertas de stock", "Bajo mínimo o agotado")}${stat(money(inv), "Valor inventario", "Costo estimado")}${stat(tod.length, "Facturas de hoy", "Transacciones")}${stat(pending, "Traslados pendientes", "Por recibir/aprobar")}${stat(risks, "Riesgos abiertos", "Diferencias altas")}</div><div class="grid two"><div class="card section"><div class="head"><div><h3>Ventas recientes</h3><p>Últimas facturas emitidas</p></div><button class="btn outline sm" onclick="go('invoices')">Ver facturas</button></div><div class="tablewrap"><table><thead><tr><th>Factura</th><th>Fecha</th><th>Cajero</th><th>Pago</th><th>Total</th></tr></thead><tbody>${
+      ss
+        .slice(-8)
+        .reverse()
+        .map(
+          (s) =>
+            `<tr><td class="mono">${s.invoice}</td><td>${new Date(s.date).toLocaleString("es-CO")}</td><td>${s.userName}</td><td>${s.payment}</td><td><b>${money(s.total)}</b></td></tr>`,
+        )
+        .join("") || '<tr><td colspan="5">Sin ventas registradas.</td></tr>'
+    }</tbody></table></div></div><div class="card section"><div class="head"><div><h3>Centro de alertas</h3><p>Prioridades de la sede</p></div><span class="badge out">${getAlerts().length}</span></div><div class="list">${
+      getAlerts()
+        .slice(0, 8)
+        .map(
+          (a) =>
+            `<div class="listitem ${a.type === "danger" ? "risk" : ""}"><div class="grow"><strong>${a.title}</strong><span>${a.text}</span></div></div>`,
+        )
+        .join("") || '<div class="empty">Sin alertas críticas.</div>'
+    }</div></div></div>`;
+  $("#alertTop").textContent = getAlerts().length;
+}
+function renderPOS() {
+  let ps = getProducts().filter((p) => p.stock > 0);
+  $("#content").innerHTML =
+    `<div class="pos"><div><div class="toolbar"><input id="posSearch" placeholder="Buscar por nombre, código o EAN" oninput="filterPOS()"><select id="posCategory" onchange="filterPOS()"><option value="">Todas las categorías</option>${[...new Set(ps.map((p) => p.category))].map((c) => `<option>${c}</option>`).join("")}</select></div><div id="posCatalog" class="catalog"></div></div><div class="card section cart"><div class="head"><div><h3>Venta actual</h3><p>${user().name} · ${db.sessionState}</p></div><button class="btn light sm" onclick="db.cart=[];save();renderPOS()">Vaciar</button></div><div id="cartLines"></div><div class="field"><label>Cliente / NIT o documento</label><input id="customer" placeholder="Consumidor final"></div><div class="field"><label>Medio de pago</label><select id="payment"><option>Efectivo</option><option>Tarjeta débito</option><option>Tarjeta crédito</option><option>Nequi</option><option>Daviplata</option><option>Transferencia</option><option>Mixto</option></select></div><div class="field"><label>Descuento general (%)</label><input id="discount" type="number" min="0" max="50" value="0" oninput="renderCart()"></div><div id="totals" class="totals"></div><button class="btn primary full" style="margin-top:14px" onclick="checkout()">Facturar y cobrar</button></div></div>`;
+  filterPOS();
+  renderCart();
+}
+function filterPOS() {
+  let q = ($("#posSearch")?.value || "").toLowerCase(),
+    c = $("#posCategory")?.value || "",
+    ps = getProducts().filter(
+      (p) =>
+        p.stock > 0 &&
+        (!q ||
+          [p.name, p.code, p.ean].some((v) =>
+            String(v).toLowerCase().includes(q),
+          )) &&
+        (!c || p.category === c),
+    );
+  $("#posCatalog").innerHTML =
+    ps
+      .map(
+        (p) =>
+          `<div class="product"><img src="${p.image}" alt="${p.name}"><div class="body"><span class="badge ${p.stock <= p.min ? "low" : "ok"}">Stock ${p.stock}</span><h4>${p.name}</h4><div class="muted">${p.code} · EAN ${p.ean}</div><div class="price">${money(p.price)}</div><button class="btn primary full sm" onclick="addCart('${p.id}')">Agregar</button></div></div>`,
+      )
+      .join("") || '<div class="empty">No hay productos disponibles.</div>';
+}
+function addCart(id) {
+  if (db.sessionState !== "Activo")
+    return toast("Debe reanudar su turno para vender");
+  let p = db.products.find((x) => x.id === id),
+    it = db.cart.find((x) => x.id === id);
+  if ((it?.qty || 0) >= p.stock)
+    return toast("No hay más unidades disponibles");
+  it ? it.qty++ : db.cart.push({ id, qty: 1 });
+  save();
+  renderCart();
+}
+function cartTotal() {
+  return db.cart.reduce((a, i) => {
+    let p = db.products.find((x) => x.id === i.id);
+    return a + p.price * i.qty;
+  }, 0);
+}
+function renderCart() {
+  let box = $("#cartLines");
+  if (!box) return;
+  box.innerHTML =
+    db.cart
+      .map((i) => {
+        let p = db.products.find((x) => x.id === i.id);
+        return `<div class="cartline"><div><b>${p.name}</b><div class="muted">${money(p.price)} c/u</div></div><div class="qty"><button onclick="changeQty('${i.id}',-1)">−</button><b>${i.qty}</b><button onclick="changeQty('${i.id}',1)">＋</button></div></div>`;
+      })
+      .join("") || '<div class="empty">Agregue productos a la venta.</div>';
+  let sub = cartTotal(),
+    d = Number($("#discount")?.value || 0),
+    disc = (sub * d) / 100,
+    total = sub - disc;
+  $("#totals").innerHTML =
+    `<div><span>Subtotal</span><b>${money(sub)}</b></div><div><span>Descuento</span><b>-${money(disc)}</b></div><div class="grand"><span>Total</span><b>${money(total)}</b></div>`;
+}
+function changeQty(id, n) {
+  let it = db.cart.find((x) => x.id === id),
+    p = db.products.find((x) => x.id === id);
+  it.qty = Math.max(0, Math.min(p.stock, it.qty + n));
+  if (!it.qty) db.cart = db.cart.filter((x) => x.id !== id);
+  save();
+  renderCart();
+}
+function checkout() {
+  if (!can("pos", "create")) return toast("No tiene permiso para facturar");
+  if (db.sessionState !== "Activo")
+    return toast("El turno está pausado o cerrado");
+  if (!db.cart.length) return toast("El carrito está vacío");
+  let sub = cartTotal(),
+    discount = Number($("#discount").value || 0),
+    disc = (sub * discount) / 100,
+    total = sub - disc,
+    invoice =
+      db.settings.invoicePrefix +
+      "-" +
+      String(db.settings.nextInvoice++).padStart(6, "0"),
+    date = now(),
+    items = db.cart.map((i) => {
+      let p = db.products.find((x) => x.id === i.id),
+        before = p.stock;
+      p.stock -= i.qty;
+      db.movements.push({
+        id: uid("m"),
+        date,
+        store: db.currentStore,
+        product: p.id,
+        productName: p.name,
+        type: "Venta",
+        qty: i.qty,
+        before,
+        after: p.stock,
+        user: user().id,
+        userName: user().name,
+        ref: invoice,
+      });
+      return {
+        product: p.id,
+        name: p.name,
+        ean: p.ean,
+        qty: i.qty,
+        price: p.price,
+        tax: p.tax,
+        total: p.price * i.qty,
+      };
+    }),
+    sale = {
+      id: uid("sale"),
+      invoice,
+      date,
+      store: db.currentStore,
+      user: user().id,
+      userName: user().name,
+      customer: $("#customer").value || "Consumidor final",
+      payment: $("#payment").value,
+      subtotal: sub,
+      discount: disc,
+      total,
+      items,
+    };
+  db.sales.push(sale);
+  db.invoices.push({
+    ...sale,
+    status: "Emitida",
+    cufe: "CUFE-" + cryptoRandom(40),
+  });
+  db.cart = [];
+  save();
+  toast("Venta facturada correctamente");
+  showInvoice(sale.id);
+}
+function cryptoRandom(n) {
+  let s = "";
+  while (s.length < n) s += Math.random().toString(36).slice(2);
+  return s.slice(0, n).toUpperCase();
+}
+function renderInvoices() {
+  let ss = getSales().slice().reverse();
+  $("#content").innerHTML =
+    `<div class="card section"><div class="head"><div><h3>Facturas emitidas</h3><p>Consulta, impresión y trazabilidad</p></div><button class="btn outline" onclick="exportInvoices()">Exportar CSV</button></div><div class="toolbar"><input id="invSearch" placeholder="Buscar factura, cliente o cajero" oninput="renderInvoices()"><input id="invDate" type="date" onchange="renderInvoices()"></div><div class="tablewrap"><table><thead><tr><th>Factura</th><th>Fecha</th><th>Cliente</th><th>Cajero</th><th>Pago</th><th>Total</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>${
+      ss
+        .filter((s) => {
+          let q = ($("#invSearch")?.value || "").toLowerCase(),
+            d = $("#invDate")?.value || "";
+          return (
+            (!q ||
+              [s.invoice, s.customer, s.userName].some((x) =>
+                String(x).toLowerCase().includes(q),
+              )) &&
+            (!d || s.date.slice(0, 10) === d)
+          );
+        })
+        .map(
+          (s) =>
+            `<tr><td class="mono"><b>${s.invoice}</b></td><td>${new Date(s.date).toLocaleString("es-CO")}</td><td>${s.customer}</td><td>${s.userName}</td><td>${s.payment}</td><td><b>${money(s.total)}</b></td><td><span class="badge ok">Emitida</span></td><td><button class="btn sm info" onclick="showInvoice('${s.id}')">Ver / imprimir</button></td></tr>`,
+        )
+        .join("") || '<tr><td colspan="8">Sin facturas.</td></tr>'
+    }</tbody></table></div></div>`;
+}
+function showInvoice(id) {
+  let s = db.sales.find((x) => x.id === id),
+    st = db.stores.find((x) => x.id === s.store);
+  openModal(
+    `Factura ${s.invoice}`,
+    `<div class="invoice-sheet"><div class="invoice-head"><div><h2 style="margin:0">${db.settings.name}</h2><div>NIT ${db.settings.nit}</div><div>${st.name} · ${st.address}</div><div>${db.settings.phone} · ${db.settings.email}</div></div><div style="text-align:right"><b>FACTURA DE VENTA</b><div class="mono">${s.invoice}</div><div>${new Date(s.date).toLocaleString("es-CO")}</div></div></div><div class="grid two"><div><b>Cliente</b><div>${s.customer}</div></div><div><b>Atendido por</b><div>${s.userName}</div></div></div><div class="tablewrap" style="margin-top:16px"><table style="min-width:0"><thead><tr><th>Producto</th><th>EAN</th><th>Cant.</th><th>Precio</th><th>Total</th></tr></thead><tbody>${s.items.map((i) => `<tr><td>${i.name}</td><td class="mono">${i.ean}</td><td>${i.qty}</td><td>${money(i.price)}</td><td>${money(i.total)}</td></tr>`).join("")}</tbody></table></div><div style="margin:18px 0 0 auto;max-width:320px"><div class="totals"><div><span>Subtotal</span><b>${money(s.subtotal)}</b></div><div><span>Descuento</span><b>-${money(s.discount)}</b></div><div class="grand"><span>Total</span><b>${money(s.total)}</b></div><div><span>Pago</span><b>${s.payment}</b></div></div></div><div class="muted" style="margin-top:20px">Documento generado por StockÁgil Pro. CUFE interno de trazabilidad: ${(db.invoices.find((i) => i.id === s.id) || {}).cufe || "—"}</div><div class="modalfoot no-print"><button class="btn outline" onclick="closeModal()">Cerrar</button><button class="btn primary" onclick="window.print()">Imprimir factura</button></div></div>`,
+    true,
+  );
+}
+function renderProducts() {
+  let ps = getProducts();
+  $("#content").innerHTML =
+    `<div class="card section"><div class="head"><div><h3>Maestro de productos</h3><p>Registro único con EAN-13, QR, precios y existencias</p></div>${can("products", "create") ? '<button class="btn primary" onclick="openProduct()">＋ Crear producto</button>' : ""}</div><div class="toolbar"><input id="prodSearch" placeholder="Buscar nombre, código o EAN" oninput="renderProducts()"><button class="btn outline" onclick="exportProducts()">Exportar</button></div><div class="tablewrap"><table><thead><tr><th>Producto</th><th>Código</th><th>EAN</th><th>Categoría</th><th>Precio</th><th>Stock</th><th>Mínimo</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>${ps
+      .filter((p) => {
+        let q = ($("#prodSearch")?.value || "").toLowerCase();
+        return (
+          !q ||
+          [p.name, p.code, p.ean].some((v) =>
+            String(v).toLowerCase().includes(q),
+          )
+        );
+      })
+      .map(
+        (p) =>
+          `<tr><td><b>${p.name}</b></td><td class="mono">${p.code}</td><td class="mono">${p.ean}</td><td>${p.category}</td><td>${money(p.price)}</td><td><b>${p.stock}</b></td><td>${p.min}</td><td><span class="badge ${p.stock === 0 ? "out" : p.stock <= p.min ? "low" : "ok"}">${p.stock === 0 ? "Agotado" : p.stock <= p.min ? "Bajo" : "Disponible"}</span></td><td><div class="actions"><button class="btn sm info" onclick="showCodes('${p.id}')">EAN / QR</button>${can("products", "edit") ? `<button class="btn sm outline" onclick="openProduct('${p.id}')">Editar</button>` : ""}</div></td></tr>`,
+      )
+      .join("")}</tbody></table></div></div>`;
+}
+function openProduct(id) {
+  let p = id
+    ? db.products.find((x) => x.id === id)
+    : {
+        ean: generateEAN(),
+        code: "PRO-" + String(db.products.length + 1).padStart(4, "0"),
+        name: "",
+        category: "Abarrotes",
+        price: 0,
+        buy: 0,
+        stock: 0,
+        min: 5,
+        tax: 0,
+        image:
+          "https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=500&q=70",
+        expiry: "",
+        active: true,
+      };
+  openModal(
+    id ? "Editar producto" : "Crear producto",
+    `<form onsubmit="saveProduct(event,'${id || ""}')"><div class="grid formgrid"><div class="field"><label>Nombre</label><input name="name" required value="${p.name}"></div><div class="field"><label>Código interno</label><input name="code" required value="${p.code}"></div><div class="field"><label>EAN-13</label><input name="ean" required maxlength="13" value="${p.ean}"></div><div class="field"><label>Categoría</label><input name="category" required value="${p.category}"></div><div class="field"><label>Precio venta</label><input name="price" type="number" required value="${p.price}"></div><div class="field"><label>Costo</label><input name="buy" type="number" required value="${p.buy}"></div><div class="field"><label>Stock inicial/actual</label><input name="stock" type="number" required value="${p.stock}"></div><div class="field"><label>Stock mínimo</label><input name="min" type="number" required value="${p.min}"></div><div class="field"><label>IVA</label><select name="tax"><option ${p.tax == 0 ? "selected" : ""}>0</option><option ${p.tax == 5 ? "selected" : ""}>5</option><option ${p.tax == 19 ? "selected" : ""}>19</option></select></div><div class="field"><label>Vencimiento</label><input name="expiry" type="date" value="${p.expiry || ""}"></div><div class="field fullspan"><label>URL de imagen</label><input name="image" value="${p.image}"></div></div><div class="modalfoot"><button class="btn primary">Guardar producto</button></div></form>`,
+  );
+}
+function generateEAN() {
+  let s = "770" + Math.floor(100000000 + Math.random() * 899999999),
+    sum = 0;
+  s.split("").forEach((d, i) => (sum += Number(d) * (i % 2 ? 3 : 1)));
+  return s + ((10 - (sum % 10)) % 10);
+}
+function saveProduct(e, id) {
+  e.preventDefault();
+  let f = Object.fromEntries(new FormData(e.target));
+  ["price", "buy", "stock", "min", "tax"].forEach((k) => (f[k] = Number(f[k])));
+  if (!/^\d{13}$/.test(f.ean)) return toast("El EAN debe tener 13 dígitos");
+  if (id)
+    Object.assign(
+      db.products.find((x) => x.id === id),
+      f,
+    );
+  else
+    db.products.push({
+      id: uid("p"),
+      store: db.currentStore,
+      active: true,
+      ...f,
+    });
+  save();
+  closeModal();
+  renderProducts();
+  toast("Producto guardado");
+}
+function eanSvg(code) {
+  let patterns = {
+      0: "0001101",
+      1: "0011001",
+      2: "0010011",
+      3: "0111101",
+      4: "0100011",
+      5: "0110001",
+      6: "0101111",
+      7: "0111011",
+      8: "0110111",
+      9: "0001011",
+    },
+    bits =
+      "101" +
+      code
+        .slice(1, 7)
+        .split("")
+        .map((d) => patterns[d])
+        .join("") +
+      "01010" +
+      code
+        .slice(7)
+        .split("")
+        .map((d) =>
+          patterns[d]
+            .split("")
+            .map((x) => (x === "1" ? "0" : "1"))
+            .reverse()
+            .join(""),
+        )
+        .join("") +
+      "101",
+    x = 10,
+    b = "";
+  for (let bit of bits) {
+    if (bit === "1") b += `<rect x="${x}" y="5" width="2" height="58"/>`;
+    x += 2;
+  }
+  return `<svg viewBox="0 0 ${x + 10} 85" xmlns="http://www.w3.org/2000/svg"><g fill="#111">${b}</g><text x="${x / 2}" y="80" text-anchor="middle" font-size="12" font-family="monospace">${code}</text></svg>`;
+}
+function showCodes(id) {
+  let p = db.products.find((x) => x.id === id);
+  openModal(
+    `Códigos de ${p.name}`,
+    `<div class="grid two"><div><div class="head"><h3>Código EAN-13</h3></div><div class="barcode">${eanSvg(p.ean)}</div><button class="btn outline full" style="margin-top:10px" onclick="window.print()">Imprimir etiqueta</button></div><div><div class="head"><h3>Código QR</h3></div><div id="qrTarget" class="qrbox"></div><button class="btn outline full" style="margin-top:10px" onclick="window.print()">Imprimir QR</button></div></div><div class="alertbox info" style="margin-top:14px"><b>Contenido QR:</b> Producto ${p.code} · EAN ${p.ean} · Sucursal ${store().name}</div>`,
+    true,
+  );
+  setTimeout(() => {
+    let t = $("#qrTarget");
+    t.innerHTML = "";
+    if (window.QRCode)
+      new QRCode(t, {
+        text: JSON.stringify({
+          product: p.id,
+          code: p.code,
+          ean: p.ean,
+          store: p.store,
+        }),
+        width: 170,
+        height: 170,
+      });
+    else t.innerHTML = "<b>QR no disponible sin conexión.</b>";
+  }, 50);
+}
+function renderMovements() {
+  let ms = db.movements
+    .filter((m) => m.store === db.currentStore)
+    .slice()
+    .reverse();
+  $("#content").innerHTML =
+    `<div class="card section"><div class="head"><div><h3>Movimientos internos</h3><p>Entradas, salidas, devoluciones, daños y ajustes</p></div>${can("movements", "create") ? '<button class="btn primary" onclick="openMovement()">＋ Registrar movimiento</button>' : ""}</div><div class="tablewrap"><table><thead><tr><th>Fecha</th><th>Producto</th><th>Tipo</th><th>Cantidad</th><th>Antes</th><th>Después</th><th>Responsable</th><th>Referencia</th></tr></thead><tbody>${ms.map((m) => `<tr><td>${new Date(m.date).toLocaleString("es-CO")}</td><td>${m.productName}</td><td><span class="badge ${["Daño", "Pérdida", "Ajuste negativo"].includes(m.type) ? "out" : "info"}">${m.type}</span></td><td>${m.qty}</td><td>${m.before}</td><td><b>${m.after}</b></td><td>${m.userName}</td><td>${m.ref || "—"}</td></tr>`).join("") || '<tr><td colspan="8">Sin movimientos.</td></tr>'}</tbody></table></div></div>`;
+}
+function openMovement() {
+  openModal(
+    "Registrar movimiento",
+    `<form onsubmit="saveMovement(event)"><div class="grid formgrid"><div class="field"><label>Producto</label><select name="product">${getProducts()
+      .map(
+        (p) => `<option value="${p.id}">${p.name} · Stock ${p.stock}</option>`,
+      )
+      .join(
+        "",
+      )}</select></div><div class="field"><label>Tipo</label><select name="type"><option>Entrada</option><option>Salida</option><option>Devolución cliente</option><option>Devolución proveedor</option><option>Daño</option><option>Pérdida</option><option>Ajuste positivo</option><option>Ajuste negativo</option><option>Conteo físico</option></select></div><div class="field"><label>Cantidad / conteo</label><input name="qty" type="number" min="0" required></div><div class="field"><label>Referencia o motivo</label><input name="ref" required></div></div><div class="modalfoot"><button class="btn primary">Guardar movimiento</button></div></form>`,
+  );
+}
+function saveMovement(e) {
+  e.preventDefault();
+  let f = Object.fromEntries(new FormData(e.target)),
+    p = db.products.find((x) => x.id === f.product),
+    qty = Number(f.qty),
+    before = p.stock,
+    after = before;
+  if (["Entrada", "Devolución cliente", "Ajuste positivo"].includes(f.type))
+    after += qty;
+  else if (
+    [
+      "Salida",
+      "Devolución proveedor",
+      "Daño",
+      "Pérdida",
+      "Ajuste negativo",
+    ].includes(f.type)
+  )
+    after -= qty;
+  else if (f.type === "Conteo físico") after = qty;
+  if (after < 0) return toast("El stock no puede quedar negativo");
+  p.stock = after;
+  db.movements.push({
+    id: uid("m"),
+    date: now(),
+    store: db.currentStore,
+    product: p.id,
+    productName: p.name,
+    type: f.type,
+    qty,
+    before,
+    after,
+    user: user().id,
+    userName: user().name,
+    ref: f.ref,
+  });
+  if (f.type === "Conteo físico" && after !== before) {
+    let diff = after - before,
+      risk = Math.abs(diff) >= Math.max(3, p.min * 0.5) ? "Alto" : "Medio";
+    db.audit.push({
+      id: uid("a"),
+      date: now(),
+      store: db.currentStore,
+      product: p.id,
+      productName: p.name,
+      expected: before,
+      physical: after,
+      diff,
+      risk,
+      resolved: false,
+      userName: user().name,
+      note: "Diferencia detectada en conteo físico",
+    });
+  }
+  save();
+  closeModal();
+  renderMovements();
+  toast("Movimiento registrado");
+}
+function renderAlerts() {
+  $("#content").innerHTML =
+    `<div class="grid stats">${stat(getProducts().filter((p) => p.stock === 0).length, "Agotados", "Reposición urgente")}${stat(getProducts().filter((p) => p.stock > 0 && p.stock <= p.min).length, "Stock bajo", "Próximos a agotarse")}${stat(getProducts().filter((p) => p.expiry && (new Date(p.expiry) - new Date()) / 86400000 <= 7).length, "Por vencer", "Próximos 7 días")}${stat(db.audit.filter((a) => a.store === db.currentStore && !a.resolved).length, "Diferencias", "Pendientes de revisión")}${stat(db.transfers.filter((t) => t.to === db.currentStore && t.status === "Pendiente").length, "Traslados", "Pendientes de recibir")}${stat(getAlerts().length, "Total alertas", "Centro de control")}</div><div class="card section"><div class="head"><div><h3>Alertas operativas</h3><p>Inventario, vencimientos y riesgos</p></div></div><div class="grid three">${
+      getAlerts()
+        .map(
+          (a) =>
+            `<div class="alertbox ${a.type === "danger" ? "danger" : ""}"><b>${a.title}</b><div>${a.text}</div></div>`,
+        )
+        .join("") || '<div class="empty">Sin alertas activas.</div>'
+    }</div></div>`;
+}
+function renderTransfers() {
+  let ts = db.transfers
+    .filter((t) => [t.from, t.to].includes(db.currentStore))
+    .slice()
+    .reverse();
+  $("#content").innerHTML =
+    `<div class="card section"><div class="head"><div><h3>Transferencias entre sucursales</h3><p>Solicitud, aprobación, despacho y recepción</p></div>${can("transfers", "create") ? '<button class="btn primary" onclick="openTransfer()">＋ Solicitar traslado</button>' : ""}</div><div class="tablewrap"><table><thead><tr><th>Solicitud</th><th>Fecha</th><th>Origen</th><th>Destino</th><th>Producto</th><th>Cantidad</th><th>Solicitante</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>${ts.map((t) => `<tr><td class="mono">${t.code}</td><td>${new Date(t.date).toLocaleString("es-CO")}</td><td>${db.stores.find((s) => s.id === t.from).name}</td><td>${db.stores.find((s) => s.id === t.to).name}</td><td>${t.productName}</td><td>${t.qty}</td><td>${t.requestedBy}</td><td><span class="badge ${t.status === "Aprobada" ? "ok" : t.status === "Rechazada" ? "out" : t.status === "Recibida" ? "info" : "low"}">${t.status}</span></td><td><div class="actions">${t.status === "Pendiente" && can("transfers", "approve") ? `<button class="btn sm primary" onclick="approveTransfer('${t.id}',true)">Aprobar</button><button class="btn sm danger" onclick="approveTransfer('${t.id}',false)">Rechazar</button>` : ""}${t.status === "Aprobada" && t.to === db.currentStore ? `<button class="btn sm info" onclick="receiveTransfer('${t.id}')">Recibir</button>` : ""}</div></td></tr>`).join("") || '<tr><td colspan="9">Sin solicitudes.</td></tr>'}</tbody></table></div></div>`;
+}
+function openTransfer() {
+  let destinations = user().branches.filter((id) => id !== db.currentStore);
+  openModal(
+    "Solicitar transferencia",
+    `<form onsubmit="saveTransfer(event)"><div class="grid formgrid"><div class="field"><label>Sucursal destino</label><select name="to">${destinations.map((id) => `<option value="${id}">${db.stores.find((s) => s.id === id).name}</option>`).join("")}</select></div><div class="field"><label>Producto</label><select name="product">${getProducts()
+      .map(
+        (p) =>
+          `<option value="${p.id}">${p.name} · ${p.stock} disponibles</option>`,
+      )
+      .join(
+        "",
+      )}</select></div><div class="field"><label>Cantidad</label><input name="qty" type="number" min="1" required></div><div class="field"><label>Motivo</label><input name="reason" required></div></div><div class="modalfoot"><button class="btn primary">Enviar solicitud</button></div></form>`,
+  );
+}
+function saveTransfer(e) {
+  e.preventDefault();
+  let f = Object.fromEntries(new FormData(e.target)),
+    p = db.products.find((x) => x.id === f.product),
+    qty = Number(f.qty);
+  if (qty > p.stock) return toast("Cantidad superior al stock disponible");
+  db.transfers.push({
+    id: uid("t"),
+    code: "TR-" + Date.now().toString().slice(-7),
+    date: now(),
+    from: db.currentStore,
+    to: f.to,
+    product: p.id,
+    productName: p.name,
+    ean: p.ean,
+    qty,
+    reason: f.reason,
+    requestedBy: user().name,
+    status: "Pendiente",
+  });
+  save();
+  closeModal();
+  renderTransfers();
+  toast("Solicitud enviada al administrador");
+}
+function approveTransfer(id, ok) {
+  let t = db.transfers.find((x) => x.id === id);
+  t.status = ok ? "Aprobada" : "Rechazada";
+  t.approvedBy = user().name;
+  t.approvedAt = now();
+  save();
+  renderTransfers();
+  toast(ok ? "Transferencia aprobada" : "Transferencia rechazada");
+}
+function receiveTransfer(id) {
+  let t = db.transfers.find((x) => x.id === id),
+    src = db.products.find((p) => p.id === t.product);
+  if (src.stock < t.qty)
+    return toast("La sede origen ya no tiene suficiente stock");
+  let dest = db.products.find((p) => p.store === t.to && p.ean === t.ean);
+  if (!dest) {
+    dest = { ...src, id: uid("p"), store: t.to, stock: 0 };
+    db.products.push(dest);
+  }
+  let b1 = src.stock,
+    b2 = dest.stock;
+  src.stock -= t.qty;
+  dest.stock += t.qty;
+  db.movements.push(
+    {
+      id: uid("m"),
+      date: now(),
+      store: t.from,
+      product: src.id,
+      productName: src.name,
+      type: "Transferencia salida",
+      qty: t.qty,
+      before: b1,
+      after: src.stock,
+      user: user().id,
+      userName: user().name,
+      ref: t.code,
+    },
+    {
+      id: uid("m"),
+      date: now(),
+      store: t.to,
+      product: dest.id,
+      productName: dest.name,
+      type: "Transferencia entrada",
+      qty: t.qty,
+      before: b2,
+      after: dest.stock,
+      user: user().id,
+      userName: user().name,
+      ref: t.code,
+    },
+  );
+  t.status = "Recibida";
+  t.receivedBy = user().name;
+  t.receivedAt = now();
+  save();
+  renderTransfers();
+  toast("Transferencia recibida y stocks actualizados");
+}
+function renderBranches() {
+  let rows = db.stores
+    .map((s) => {
+      let ps = getProducts(s.id),
+        value = ps.reduce((a, p) => a + p.stock * p.buy, 0);
+      return `<tr><td><b>${s.name}</b><div class="muted">${s.address}</div></td><td>${s.city}</td><td>${ps.length}</td><td>${ps.reduce((a, p) => a + p.stock, 0)}</td><td>${money(value)}</td><td>${db.users.filter((u) => u.branches.includes(s.id)).length}</td><td>${s.active ? '<span class="badge ok">Activa</span>' : '<span class="badge out">Inactiva</span>'}</td><td><button class="btn sm info" onclick="viewBranchStock('${s.id}')">Ver stock</button>${can("branches", "edit") ? `<button class="btn sm outline" onclick="openBranch('${s.id}')">Editar</button>` : ""}</td></tr>`;
+    })
+    .join("");
+  $("#content").innerHTML =
+    `<div class="card section"><div class="head"><div><h3>Red de sucursales</h3><p>Inventario y usuarios por sede</p></div>${can("branches", "create") ? '<button class="btn primary" onclick="openBranch()">＋ Nueva sucursal</button>' : ""}</div><div class="tablewrap"><table><thead><tr><th>Sucursal</th><th>Ciudad</th><th>Productos</th><th>Unidades</th><th>Valor inventario</th><th>Usuarios con acceso</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+}
+function viewBranchStock(id) {
+  let ps = getProducts(id),
+    s = db.stores.find((x) => x.id === id);
+  openModal(
+    `Stock de ${s.name}`,
+    `<div class="tablewrap"><table><thead><tr><th>Producto</th><th>EAN</th><th>Stock</th><th>Mínimo</th><th>Estado</th></tr></thead><tbody>${ps.map((p) => `<tr><td>${p.name}</td><td class="mono">${p.ean}</td><td><b>${p.stock}</b></td><td>${p.min}</td><td><span class="badge ${p.stock === 0 ? "out" : p.stock <= p.min ? "low" : "ok"}">${p.stock === 0 ? "Agotado" : p.stock <= p.min ? "Bajo" : "Disponible"}</span></td></tr>`).join("")}</tbody></table></div>`,
+    true,
+  );
+}
+function openBranch(id) {
+  let s = id
+    ? db.stores.find((x) => x.id === id)
+    : { name: "", city: "", address: "", active: true };
+  openModal(
+    id ? "Editar sucursal" : "Nueva sucursal",
+    `<form onsubmit="saveBranch(event,'${id || ""}')"><div class="grid formgrid"><div class="field"><label>Nombre</label><input name="name" required value="${s.name}"></div><div class="field"><label>Ciudad</label><input name="city" required value="${s.city}"></div><div class="field fullspan"><label>Dirección</label><input name="address" required value="${s.address}"></div><div class="field"><label>Estado</label><select name="active"><option value="true" ${s.active ? "selected" : ""}>Activa</option><option value="false" ${!s.active ? "selected" : ""}>Inactiva</option></select></div></div><div class="modalfoot"><button class="btn primary">Guardar</button></div></form>`,
+  );
+}
+function saveBranch(e, id) {
+  e.preventDefault();
+  let f = Object.fromEntries(new FormData(e.target));
+  f.active = f.active === "true";
+  if (id)
+    Object.assign(
+      db.stores.find((s) => s.id === id),
+      f,
+    );
+  else db.stores.push({ id: uid("s"), ...f });
+  save();
+  closeModal();
+  renderBranches();
+  toast("Sucursal guardada");
+}
+function renderUsers() {
+  let rows = db.users
+    .map(
+      (u) =>
+        `<tr><td><b>${u.name}</b><div class="muted mono">${u.username}</div></td><td>${u.role}</td><td>${u.branches.map((id) => db.stores.find((s) => s.id === id)?.name).join(", ")}</td><td>${u.permissions.length} módulos</td><td>${u.active ? '<span class="badge ok">Activo</span>' : '<span class="badge out">Bloqueado</span>'}</td><td>${u.createdBy}</td><td><div class="actions"><button class="btn sm info" onclick="openUser('${u.id}')">Editar permisos</button>${u.id !== db.currentUser ? `<button class="btn sm ${u.active ? "danger" : "primary"}" onclick="toggleUser('${u.id}')">${u.active ? "Bloquear" : "Activar"}</button>` : ""}</div></td></tr>`,
+    )
+    .join("");
+  $("#content").innerHTML =
+    `<div class="card section"><div class="head"><div><h3>Usuarios, roles y accesos</h3><p>Permisos por módulo, acción y sucursal</p></div><button class="btn primary" onclick="openUser()">＋ Crear usuario</button></div><div class="tablewrap"><table><thead><tr><th>Usuario</th><th>Rol</th><th>Sucursales</th><th>Módulos</th><th>Estado</th><th>Creado por</th><th>Acciones</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+}
+function openUser(id) {
+  let u = id
+    ? db.users.find((x) => x.id === id)
+    : {
+        name: "",
+        username: "",
+        password: "",
+        role: "Cajero",
+        store: db.currentStore,
+        active: true,
+        branches: [db.currentStore],
+        permissions: defaultPerms.Cajero,
+        actions: {},
+      };
+  openModal(
+    id ? "Editar usuario" : "Crear usuario",
+    `<form onsubmit="saveUser(event,'${id || ""}')"><div class="grid formgrid"><div class="field"><label>Nombre completo</label><input name="name" required value="${u.name}"></div><div class="field"><label>Usuario</label><input name="username" required value="${u.username}"></div><div class="field"><label>Contraseña</label><input name="password" required value="${u.password}"></div><div class="field"><label>Rol</label><select name="role"><option ${u.role === "Administrador" ? "selected" : ""}>Administrador</option><option ${u.role === "Supervisor" ? "selected" : ""}>Supervisor</option><option ${u.role === "Cajero" ? "selected" : ""}>Cajero</option><option ${u.role === "Bodega" ? "selected" : ""}>Bodega</option></select></div><div class="field"><label>Sucursal principal</label><select name="store">${db.stores.map((s) => `<option value="${s.id}" ${u.store === s.id ? "selected" : ""}>${s.name}</option>`).join("")}</select></div><div class="field"><label>Estado</label><select name="active"><option value="true" ${u.active ? "selected" : ""}>Activo</option><option value="false" ${!u.active ? "selected" : ""}>Bloqueado</option></select></div><div class="field fullspan"><label>Sucursales permitidas</label><div class="permission-grid">${db.stores.map((s) => `<label class="permission"><input type="checkbox" name="branches" value="${s.id}" ${u.branches.includes(s.id) ? "checked" : ""}><span><b>${s.name}</b><div class="muted">${s.city}</div></span></label>`).join("")}</div></div><div class="field fullspan"><label>Permisos por módulo y acción</label><div class="permission-grid">${Object.entries(
+      MODULES,
+    )
+      .map(
+        ([m, v]) =>
+          `<div class="permission" style="display:block"><label><input type="checkbox" name="modules" value="${m}" ${u.permissions.includes(m) ? "checked" : ""}> <b>${v[0]}</b></label><div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:7px">${ACTIONS.map((a) => `<label class="muted"><input type="checkbox" name="act_${m}" value="${a}" ${(u.actions[m] || []).includes(a) ? "checked" : ""}> ${a}</label>`).join("")}</div></div>`,
+      )
+      .join(
+        "",
+      )}</div></div></div><div class="alertbox info">El administrador controla exactamente qué páginas, acciones y sedes puede utilizar cada cuenta.</div><div class="modalfoot"><button class="btn primary">Guardar usuario</button></div></form>`,
+    true,
+  );
+}
+function saveUser(e, id) {
+  e.preventDefault();
+  let fd = new FormData(e.target),
+    data = {
+      name: fd.get("name"),
+      username: fd.get("username"),
+      password: fd.get("password"),
+      role: fd.get("role"),
+      store: fd.get("store"),
+      active: fd.get("active") === "true",
+      branches: fd.getAll("branches"),
+      permissions: fd.getAll("modules"),
+      actions: {},
+    };
+  data.permissions.forEach((m) => (data.actions[m] = fd.getAll("act_" + m)));
+  if (!data.branches.length) return toast("Seleccione al menos una sucursal");
+  if (
+    db.users.some(
+      (x) =>
+        x.username.toLowerCase() === data.username.toLowerCase() && x.id !== id,
+    )
+  )
+    return toast("El usuario ya existe");
+  if (id)
+    Object.assign(
+      db.users.find((x) => x.id === id),
+      data,
+    );
+  else db.users.push({ id: uid("u"), createdBy: user().name, ...data });
+  save();
+  closeModal();
+  renderUsers();
+  toast("Usuario y permisos guardados");
+}
+function toggleUser(id) {
+  let u = db.users.find((x) => x.id === id);
+  u.active = !u.active;
+  save();
+  renderUsers();
+  toast(u.active ? "Usuario activado" : "Usuario bloqueado");
+}
+function renderCash() {
+  let open = db.cashSessions.find(
+      (c) => c.user === db.currentUser && !c.closed,
+    ),
+    sales = open
+      ? db.sales.filter(
+          (s) => s.user === db.currentUser && s.date >= open.opened,
+        )
+      : [],
+    expected =
+      (open?.base || 0) +
+      sales
+        .filter((s) => s.payment === "Efectivo")
+        .reduce((a, s) => a + s.total, 0);
+  $("#content").innerHTML =
+    `<div class="grid stats">${stat(open ? "Abierta" : "Cerrada", "Estado de caja", db.sessionState)}${stat(money(open?.base || 0), "Base inicial", "Efectivo de apertura")}${stat(money(expected), "Efectivo esperado", "Base + ventas efectivo")}${stat(sales.length, "Transacciones", "Turno actual")}${stat(money(sales.reduce((a, s) => a + s.total, 0)), "Ventas turno", "Todos los medios")}${stat(user().name, "Responsable", "Caja actual")}</div><div class="grid two"><div class="card section"><div class="head"><div><h3>Control del turno</h3><p>Apertura, pausas, almuerzo y cierre</p></div></div>${open ? `<div class="alertbox info"><b>Caja abierta:</b> ${new Date(open.opened).toLocaleString("es-CO")}<br><b>Estado actual:</b> ${db.sessionState}</div><div class="grid four"><button class="btn warn" onclick="setSession('Almuerzo')">Almuerzo</button><button class="btn light" onclick="setSession('Pausa')">Pausa</button><button class="btn purple" onclick="setSession('Cambio de turno')">Cambio turno</button><button class="btn primary" onclick="setSession('Activo')">Reanudar</button></div><button class="btn danger full" style="margin-top:12px" onclick="closeCash()">Cerrar y arquear caja</button>` : `<div class="empty">La caja está cerrada.</div><button class="btn primary full" style="margin-top:12px" onclick="openCash()">Abrir caja</button>`}</div><div class="card section"><div class="head"><div><h3>Ventas del turno</h3><p>Resumen por medio de pago</p></div></div>${
+      Object.entries(
+        sales.reduce(
+          (a, s) => ((a[s.payment] = (a[s.payment] || 0) + s.total), a),
+          {},
+        ),
+      )
+        .map(
+          ([k, v]) =>
+            `<div class="listitem"><div class="grow"><strong>${k}</strong><span>${money(v)}</span></div></div>`,
+        )
+        .join("") || '<div class="empty">Sin ventas en este turno.</div>'
+    }</div></div>`;
+}
+function openCash() {
+  openModal(
+    "Abrir caja",
+    `<form onsubmit="saveOpenCash(event)"><div class="field"><label>Base inicial</label><input name="base" type="number" min="0" required value="100000"></div><div class="modalfoot"><button class="btn primary">Abrir caja</button></div></form>`,
+  );
+}
+function saveOpenCash(e) {
+  e.preventDefault();
+  db.cashSessions.push({
+    id: uid("c"),
+    user: db.currentUser,
+    store: db.currentStore,
+    opened: now(),
+    base: Number(new FormData(e.target).get("base")),
+    closed: null,
+  });
+  db.sessionState = "Activo";
+  save();
+  closeModal();
+  renderCash();
+  updateSession();
+  toast("Caja abierta");
+}
+function setSession(s) {
+  db.sessionState = s;
+  save();
+  updateSession();
+  renderCash();
+  toast("Estado cambiado a " + s);
+}
+function quickPause() {
+  if (!db.currentUser) return;
+  db.sessionState = db.sessionState === "Activo" ? "Pausa" : "Activo";
+  save();
+  updateSession();
+  toast("Estado: " + db.sessionState);
+}
+function closeCash() {
+  let c = db.cashSessions.find((x) => x.user === db.currentUser && !x.closed),
+    sales = db.sales.filter(
+      (s) => s.user === db.currentUser && s.date >= c.opened,
+    ),
+    expected =
+      c.base +
+      sales
+        .filter((s) => s.payment === "Efectivo")
+        .reduce((a, s) => a + s.total, 0);
+  openModal(
+    "Arqueo y cierre",
+    `<form onsubmit="saveCloseCash(event,'${c.id}',${expected})"><div class="alertbox info">Efectivo esperado: <b>${money(expected)}</b></div><div class="field"><label>Efectivo contado</label><input name="counted" type="number" required></div><div class="field"><label>Observación</label><textarea name="note"></textarea></div><div class="modalfoot"><button class="btn danger">Cerrar caja</button></div></form>`,
+  );
+}
+function saveCloseCash(e, id, expected) {
+  e.preventDefault();
+  let c = db.cashSessions.find((x) => x.id === id),
+    f = Object.fromEntries(new FormData(e.target));
+  c.closed = now();
+  c.counted = Number(f.counted);
+  c.expected = expected;
+  c.diff = c.counted - expected;
+  c.note = f.note;
+  db.sessionState = "Cerrado";
+  if (Math.abs(c.diff) >= 20000)
+    db.audit.push({
+      id: uid("a"),
+      date: now(),
+      store: db.currentStore,
+      product: null,
+      productName: "Caja",
+      expected,
+      physical: c.counted,
+      diff: c.diff,
+      risk: "Alto",
+      resolved: false,
+      userName: user().name,
+      note: "Diferencia significativa en cierre de caja",
+    });
+  save();
+  closeModal();
+  renderCash();
+  updateSession();
+  toast("Caja cerrada");
+}
+function renderReports() {
+  let ss = getSales(),
+    byDay = ss.reduce(
+      (a, s) => (
+        (a[s.date.slice(0, 10)] = (a[s.date.slice(0, 10)] || 0) + s.total),
+        a
+      ),
+      {},
+    ),
+    byPay = ss.reduce(
+      (a, s) => ((a[s.payment] = (a[s.payment] || 0) + s.total), a),
+      {},
+    ),
+    rev = ss.reduce((a, s) => a + s.total, 0),
+    profit = ss.reduce(
+      (a, s) =>
+        a +
+        s.items.reduce((b, i) => {
+          let p = db.products.find((x) => x.id === i.product);
+          return b + (i.price - (p?.buy || 0)) * i.qty;
+        }, 0),
+      0,
+    );
+  $("#content").innerHTML =
+    `<div class="grid stats">${stat(money(rev), "Ventas totales", "Sede actual")}${stat(ss.length, "Facturas", "Transacciones")}${stat(money(ss.length ? rev / ss.length : 0), "Ticket promedio", "Por venta")}${stat(money(profit), "Utilidad estimada", "Antes de gastos")}${stat(Object.keys(byDay).length, "Días con ventas", "Cobertura")}${stat(Object.keys(byPay).length, "Medios de pago", "Utilizados")}</div><div class="grid two"><div class="card section"><div class="head"><div><h3>Ventas por día</h3><p>Ingresos diarios</p></div><button class="btn outline sm" onclick="exportDaily()">Exportar</button></div>${
+      Object.entries(byDay)
+        .sort()
+        .reverse()
+        .slice(0, 14)
+        .map(
+          ([d, v]) =>
+            `<div class="listitem"><div class="grow"><strong>${d}</strong><span>${money(v)}</span><div class="chartbar"><span style="width:${Math.min(100, (v / Math.max(...Object.values(byDay))) * 100)}%"></span></div></div></div>`,
+        )
+        .join("") || '<div class="empty">Sin datos.</div>'
+    }</div><div class="card section"><div class="head"><div><h3>Ventas por medio de pago</h3><p>Distribución de recaudo</p></div></div>${
+      Object.entries(byPay)
+        .map(
+          ([k, v]) =>
+            `<div class="listitem"><div class="grow"><strong>${k}</strong><span>${money(v)} · ${rev ? Math.round((v / rev) * 100) : 0}%</span></div></div>`,
+        )
+        .join("") || '<div class="empty">Sin datos.</div>'
+    }</div></div>`;
+}
+function renderAudit() {
+  let rows = db.audit
+    .filter((a) => a.store === db.currentStore)
+    .slice()
+    .reverse();
+  $("#content").innerHTML =
+    `<div class="grid stats">${stat(rows.length, "Eventos auditados", "Conteos y caja")}${stat(rows.filter((a) => a.risk === "Alto" && !a.resolved).length, "Riesgo alto", "Revisión inmediata")}${stat(rows.filter((a) => a.risk === "Medio" && !a.resolved).length, "Riesgo medio", "Seguimiento")}${stat(rows.filter((a) => a.resolved).length, "Resueltos", "Casos cerrados")}${stat(
+      rows.reduce((a, x) => a + Math.abs(Number(x.diff || 0)), 0),
+      "Diferencia acumulada",
+      "Unidades / valores",
+    )}${stat(db.movements.filter((m) => m.store === db.currentStore && ["Pérdida", "Daño"].includes(m.type)).length, "Pérdidas declaradas", "Movimientos internos")}</div><div class="card section"><div class="head"><div><h3>Auditoría y detección de pérdidas</h3><p>El sistema identifica diferencias; no acusa personas automáticamente.</p></div><button class="btn primary" onclick="openAuditCount()">＋ Realizar conteo</button></div><div class="alertbox danger"><b>Importante:</b> una diferencia alta puede deberse a error de registro, daño, merma o posible hurto. Debe investigarse antes de tomar decisiones.</div><div class="tablewrap"><table><thead><tr><th>Fecha</th><th>Elemento</th><th>Esperado</th><th>Físico</th><th>Diferencia</th><th>Riesgo</th><th>Responsable</th><th>Estado</th><th>Acción</th></tr></thead><tbody>${rows.map((a) => `<tr><td>${new Date(a.date).toLocaleString("es-CO")}</td><td>${a.productName}</td><td>${a.expected}</td><td>${a.physical}</td><td><b>${a.diff}</b></td><td><span class="badge ${a.risk === "Alto" ? "out" : "low"}">${a.risk}</span></td><td>${a.userName}</td><td>${a.resolved ? '<span class="badge ok">Resuelto</span>' : '<span class="badge out">Abierto</span>'}</td><td>${!a.resolved ? `<button class="btn sm primary" onclick="resolveAudit('${a.id}')">Resolver</button>` : ""}</td></tr>`).join("") || '<tr><td colspan="9">Sin diferencias detectadas.</td></tr>'}</tbody></table></div></div>`;
+}
+function openAuditCount() {
+  openMovement();
+}
+function resolveAudit(id) {
+  let a = db.audit.find((x) => x.id === id);
+  openModal(
+    "Resolver evento de auditoría",
+    `<form onsubmit="saveResolve(event,'${id}')"><div class="field"><label>Conclusión / acción tomada</label><textarea name="resolution" required></textarea></div><div class="modalfoot"><button class="btn primary">Cerrar caso</button></div></form>`,
+  );
+}
+function saveResolve(e, id) {
+  e.preventDefault();
+  let a = db.audit.find((x) => x.id === id);
+  a.resolved = true;
+  a.resolution = new FormData(e.target).get("resolution");
+  a.resolvedBy = user().name;
+  a.resolvedAt = now();
+  save();
+  closeModal();
+  renderAudit();
+  toast("Caso cerrado");
+}
+function renderSettings() {
+  $("#content").innerHTML =
+    `<div class="grid two"><div class="card section"><div class="head"><div><h3>Datos de la empresa</h3><p>Información general y facturación</p></div></div><div class="grid formgrid"><div class="field"><label>Razón social</label><input id="cfgName" value="${db.settings.name}"></div><div class="field"><label>NIT</label><input id="cfgNit" value="${db.settings.nit}"></div><div class="field"><label>Teléfono</label><input id="cfgPhone" value="${db.settings.phone}"></div><div class="field"><label>Correo</label><input id="cfgEmail" value="${db.settings.email}"></div><div class="field"><label>Prefijo factura</label><input id="cfgPrefix" value="${db.settings.invoicePrefix}"></div><div class="field"><label>Siguiente consecutivo</label><input id="cfgNext" type="number" value="${db.settings.nextInvoice}"></div></div><button class="btn primary" onclick="saveSettings()">Guardar configuración</button></div><div class="card section"><div class="head"><div><h3>Copias y portabilidad</h3><p>Protección y migración de datos</p></div></div><div class="list"><button class="btn outline full" onclick="backupNow()">Crear copia automática ahora</button><button class="btn outline full" onclick="downloadBackup()">Descargar respaldo JSON</button><label class="btn outline full">Restaurar respaldo<input type="file" accept=".json" hidden onchange="restoreBackup(event)"></label><button class="btn danger full" onclick="resetDemo()">Restablecer datos de demostración</button></div><div class="alertbox info" style="margin-top:14px">Última copia: ${db.lastBackup ? new Date(db.lastBackup).toLocaleString("es-CO") : "No registrada"}</div></div></div>`;
+}
+function saveSettings() {
+  db.settings.name = $("#cfgName").value;
+  db.settings.nit = $("#cfgNit").value;
+  db.settings.phone = $("#cfgPhone").value;
+  db.settings.email = $("#cfgEmail").value;
+  db.settings.invoicePrefix = $("#cfgPrefix").value;
+  db.settings.nextInvoice = Number($("#cfgNext").value);
+  save();
+  toast("Configuración guardada");
+}
+function openModal(title, html, wide = false) {
+  $("#modalTitle").textContent = title;
+  $("#modalBody").innerHTML = html;
+  $("#modal").classList.toggle("wide", wide);
+  $("#modalBack").classList.add("open");
+}
+function closeModal() {
+  $("#modalBack").classList.remove("open");
+}
+$("#modalBack").addEventListener("click", (e) => {
+  if (e.target.id === "modalBack") closeModal();
+});
+function toggleSidebar() {
+  $("#sidebar").classList.toggle("open");
+}
+function updateSession() {
+  $("#sessionStatus").textContent = db.sessionState;
+  $("#stateDot").className =
+    "dot" + (db.sessionState === "Activo" ? "" : " pause");
+  $("#clock").textContent = new Date().toLocaleTimeString("es-CO", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+setInterval(updateSession, 30000);
+function csv(rows) {
+  return (
+    "\ufeff" +
+    rows
+      .map((r) =>
+        r.map((v) => `"${String(v ?? "").replaceAll('"', '""')}"`).join(","),
+      )
+      .join("\n")
+  );
+}
+function download(data, name, type = "text/csv") {
+  let a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([data], { type }));
+  a.download = name;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+function exportProducts() {
+  download(
+    csv([
+      [
+        "EAN",
+        "Código",
+        "Producto",
+        "Categoría",
+        "Precio",
+        "Costo",
+        "Stock",
+        "Mínimo",
+      ],
+      ...getProducts().map((p) => [
+        p.ean,
+        p.code,
+        p.name,
+        p.category,
+        p.price,
+        p.buy,
+        p.stock,
+        p.min,
+      ]),
+    ]),
+    "productos_stockagil.csv",
+  );
+}
+function exportInvoices() {
+  download(
+    csv([
+      [
+        "Factura",
+        "Fecha",
+        "Cliente",
+        "Cajero",
+        "Pago",
+        "Subtotal",
+        "Descuento",
+        "Total",
+      ],
+      ...getSales().map((s) => [
+        s.invoice,
+        s.date,
+        s.customer,
+        s.userName,
+        s.payment,
+        s.subtotal,
+        s.discount,
+        s.total,
+      ]),
+    ]),
+    "facturas_stockagil.csv",
+  );
+}
+function exportDaily() {
+  let by = getSales().reduce(
+    (a, s) => (
+      (a[s.date.slice(0, 10)] = (a[s.date.slice(0, 10)] || 0) + s.total),
+      a
+    ),
+    {},
+  );
+  download(
+    csv([["Fecha", "Ventas"], ...Object.entries(by)]),
+    "ventas_diarias.csv",
+  );
+}
+function backupNow() {
+  db.lastBackup = now();
+  localStorage.setItem("stockagil_v8_backup", JSON.stringify(db));
+  save();
+  toast("Copia automática creada");
+}
+function downloadBackup() {
+  download(
+    JSON.stringify(db, null, 2),
+    `StockAgil_Backup_${today()}.json`,
+    "application/json",
+  );
+}
+function restoreBackup(e) {
+  let f = e.target.files[0];
+  if (!f) return;
+  let r = new FileReader();
+  r.onload = () => {
+    try {
+      db = JSON.parse(r.result);
+      save();
+      renderShell();
+      go("dashboard");
+      toast("Respaldo restaurado");
+    } catch {
+      toast("Archivo no válido");
+    }
+  };
+  r.readAsText(f);
+}
+function resetDemo() {
+  if (!confirm("¿Restablecer todos los datos de demostración?")) return;
+  db = seed();
+  save();
+  logout();
+}
+setInterval(() => {
+  if (db.currentUser) {
+    db.lastBackup = now();
+    localStorage.setItem("stockagil_v9_backup_auto", JSON.stringify(db));
+    save();
+  }
+}, 300000);
+/* ===== StockÁgil Pro v9 - mejoras operativas empresariales ===== */
+(function migrateV9() {
+  db.version = 9;
+  db.settings = {
+    cashMax: 800000,
+    icaRate: 0.414,
+    legalName: db.settings.name,
+    invoiceNote:
+      "Gracias por su compra. Conserve esta factura para cambios y garantías.",
+    ...db.settings,
+  };
+  db.notifications = db.notifications || [];
+  db.cashWithdrawals = db.cashWithdrawals || [];
+  db.shiftEvents = db.shiftEvents || [];
+  db.securityEvents = db.securityEvents || [];
+  db.users.forEach((u) => {
+    u.actions = u.actions || {};
+    if (u.role === "Administrador") {
+      u.permissions = Object.keys(MODULES);
+      Object.keys(MODULES).forEach((m) => (u.actions[m] = [...ACTIONS]));
+      u.branches = db.stores.map((s) => s.id);
+    }
+  });
+  save();
+})();
+function isAdmin() {
+  return user()?.role === "Administrador";
+}
+function isSupervisor() {
+  return ["Administrador", "Supervisor"].includes(user()?.role);
+}
+function openCashSession() {
+  return db.cashSessions.find((c) => c.user === db.currentUser && !c.closed);
+}
+function shiftSales(c = openCashSession()) {
+  return c
+    ? db.sales.filter((s) => s.user === db.currentUser && s.date >= c.opened)
+    : [];
+}
+function cashSales(c = openCashSession()) {
+  return shiftSales(c)
+    .filter((s) => s.payment === "Efectivo")
+    .reduce((a, s) => a + s.total, 0);
+}
+function cashWithdrawn(c = openCashSession()) {
+  return c
+    ? db.cashWithdrawals
+        .filter((w) => w.cashSession === c.id && w.status === "Aprobado")
+        .reduce((a, w) => a + w.amount, 0)
+    : 0;
+}
+function cashOnHand(c = openCashSession()) {
+  return c ? (c.base || 0) + cashSales(c) - cashWithdrawn(c) : 0;
+}
+function cashBlocked() {
+  let c = openCashSession();
+  return !!c && cashOnHand(c) >= Number(db.settings.cashMax || 800000);
+}
+function notifyAdmins(title, text, type = "info", data = {}) {
+  db.users
+    .filter((u) => u.role === "Administrador" && u.active)
+    .forEach((u) =>
+      db.notifications.push({
+        id: uid("n"),
+        user: u.id,
+        date: now(),
+        title,
+        text,
+        type,
+        read: false,
+        ...data,
+      }),
+    );
+  save();
+}
+function myNotifications() {
+  return db.notifications
+    .filter((n) => n.user === db.currentUser)
+    .sort((a, b) => b.date.localeCompare(a.date));
+}
+function markNotifications() {
+  myNotifications().forEach((n) => (n.read = true));
+  save();
+  renderNotificationCenter();
+}
+function renderNotificationCenter() {
+  let old = document.getElementById("notificationPanel");
+  if (old) old.remove();
+  let ns = myNotifications(),
+    unread = ns.filter((n) => !n.read).length;
+  let b = document.getElementById("alertTop");
+  if (b) {
+    b.textContent = getAlerts().length + unread;
+    b.title = `${getAlerts().length} alertas y ${unread} mensajes`;
+  }
+}
+function showNotifications() {
+  let ns = myNotifications();
+  openModal(
+    "Centro de mensajes",
+    `<div class="head"><div><h3>Notificaciones operativas</h3><p>Transferencias, retiros, bloqueos y novedades</p></div><button class="btn outline sm" onclick="markNotifications()">Marcar leídas</button></div><div class="list">${ns.map((n) => `<div class="listitem ${n.read ? "" : "risk"}"><div class="grow"><strong>${n.title}</strong><span>${n.text}<br>${new Date(n.date).toLocaleString("es-CO")}</span></div><span class="badge ${n.type === "danger" ? "out" : n.type === "warning" ? "low" : "info"}">${n.read ? "Leída" : "Nueva"}</span></div>`).join("") || '<div class="empty">No hay mensajes.</div>'}</div>`,
+    true,
+  );
+}
+const _renderShell = renderShell;
+renderShell = function () {
+  _renderShell();
+  let top = document.querySelector(".top-actions");
+  if (top && !document.getElementById("msgBtn"))
+    top.insertAdjacentHTML(
+      "afterbegin",
+      `<button id="msgBtn" class="btn outline" onclick="showNotifications()">🔔 Mensajes</button>`,
+    );
+  renderNotificationCenter();
+};
+const _getAlerts = getAlerts;
+getAlerts = function () {
+  let arr = _getAlerts();
+  let c = openCashSession();
+  if (c && cashBlocked())
+    arr.unshift({
+      type: "danger",
+      title: "Caja bloqueada por tope de efectivo",
+      text: `Efectivo estimado ${money(cashOnHand(c))}. Requiere retiro autorizado.`,
+    });
+  db.transfers
+    .filter(
+      (t) =>
+        t.status === "Pendiente" &&
+        (isAdmin() || t.to === db.currentStore || t.from === db.currentStore),
+    )
+    .forEach((t) =>
+      arr.push({
+        type: "warning",
+        title: "Transferencia pendiente",
+        text: `${t.code}: ${t.productName} x ${t.qty}`,
+      }),
+    );
+  return arr;
+};
+const _renderNav = renderNav;
+renderNav = function () {
+  _renderNav();
+  document
+    .querySelectorAll(".logo")
+    .forEach(
+      (el) =>
+        (el.innerHTML = `<svg viewBox="0 0 64 64" width="38" height="38" aria-label="StockÁgil"><path fill="currentColor" d="M10 14h8l5 26h25l6-18H22l-1-5h38l-8 28H20L15 20h-5z"/><circle cx="27" cy="52" r="5" fill="currentColor"/><circle cx="47" cy="52" r="5" fill="currentColor"/><path d="M29 28h16M29 34h12" stroke="#fff" stroke-width="3" stroke-linecap="round"/></svg>`),
+    );
+};
+const _renderDashboardV8 = renderDashboard;
+renderDashboard = function () {
+  _renderDashboardV8();
+  let pendingAll = db.transfers.filter((t) => t.status === "Pendiente").length,
+    unread = myNotifications().filter((n) => !n.read).length;
+  let hero = document.querySelector(".hero");
+  if (hero)
+    hero.insertAdjacentHTML(
+      "afterend",
+      `<div class="grid three" style="margin-bottom:18px"><div class="card section"><b>📨 Bandeja administrativa</b><div class="muted">${pendingAll} transferencias pendientes · ${unread} mensajes nuevos</div><button class="btn info sm" style="margin-top:10px" onclick="go('transfers')">Revisar solicitudes</button></div><div class="card section"><b>💵 Control de efectivo</b><div class="muted">Tope por caja: ${money(db.settings.cashMax)}</div><button class="btn outline sm" style="margin-top:10px" onclick="go('cash')">Ver caja y retiros</button></div><div class="card section"><b>🛡️ Seguridad operacional</b><div class="muted">Bloqueos, diferencias y trazabilidad por usuario</div><button class="btn outline sm" style="margin-top:10px" onclick="go('audit')">Abrir auditoría</button></div></div>`,
+    );
+  renderNotificationCenter();
+};
+renderPOS = function () {
+  let ps = getProducts().filter((p) => p.stock > 0),
+    c = openCashSession(),
+    blocked = cashBlocked();
+  $("#content").innerHTML =
+    `${blocked ? `<div class="alertbox danger"><b>Caja bloqueada:</b> se alcanzó el tope de efectivo (${money(db.settings.cashMax)}). Un supervisor o administrador debe autorizar un retiro para continuar.</div>` : ""}<div id="nextCustomerBanner" class="alertbox ok hidden"><b>Factura impresa.</b> Venta finalizada. Puede atender al siguiente cliente.</div><div class="pos"><div><div class="toolbar"><input id="posSearch" placeholder="Escanee EAN o busque producto" oninput="filterPOS()" onkeydown="if(event.key==='Enter')scanEAN(this.value)"><select id="posCategory" onchange="filterPOS()"><option value="">Todas las categorías</option>${[...new Set(ps.map((p) => p.category))].map((c) => `<option>${c}</option>`).join("")}</select></div><div id="posCatalog" class="catalog"></div></div><div class="card section cart"><div class="head"><div><h3>Venta actual</h3><p>${user().name} · ${db.sessionState} · ${store().name}</p></div><button class="btn light sm" onclick="clearSale()">Vaciar</button></div><div id="cartLines"></div><div class="field"><label>Cliente / NIT o documento</label><input id="customer" placeholder="Consumidor final"></div><div class="field"><label>Medio de pago</label><select id="payment"><option>Efectivo</option><option>Tarjeta débito</option><option>Tarjeta crédito</option><option>Nequi</option><option>Daviplata</option><option>Transferencia</option><option>Mixto</option></select></div><div class="field"><label>Descuento general (%)</label><input id="discount" type="number" min="0" max="50" value="0" oninput="renderCart()"></div><div id="totals" class="totals"></div><button class="btn primary full" style="margin-top:14px" ${blocked ? "disabled" : ""} onclick="checkout()">Generar factura y cobrar</button></div></div>`;
+  filterPOS();
+  renderCart();
+};
+function scanEAN(v) {
+  let p = getProducts().find(
+    (p) =>
+      p.ean === String(v).trim() ||
+      p.code.toLowerCase() === String(v).trim().toLowerCase(),
+  );
+  if (p) {
+    addCart(p.id);
+    $("#posSearch").value = "";
+    filterPOS();
+  } else toast("Código EAN no encontrado");
+}
+function clearSale() {
+  db.cart = [];
+  save();
+  renderPOS();
+  toast("Venta cancelada y carrito vacío");
+}
+function calculateSale() {
+  let gross = cartTotal(),
+    discountPct = Number($("#discount")?.value || 0),
+    discount = (gross * discountPct) / 100,
+    net = gross - discount;
+  let tax = db.cart.reduce((a, i) => {
+    let p = db.products.find((x) => x.id === i.id),
+      line = p.price * i.qty * (1 - discountPct / 100);
+    return a + line - line / (1 + (p.tax || 0) / 100);
+  }, 0);
+  let base = net - tax,
+    ica = (base * Number(db.settings.icaRate || 0)) / 100;
+  return { gross, discountPct, discount, net, base, tax, ica, total: net };
+}
+renderCart = function () {
+  let box = $("#cartLines");
+  if (!box) return;
+  box.innerHTML =
+    db.cart
+      .map((i) => {
+        let p = db.products.find((x) => x.id === i.id);
+        return `<div class="cartline"><div><b>${p.name}</b><div class="muted">${p.ean} · ${money(p.price)} c/u</div></div><div class="qty"><button onclick="changeQty('${i.id}',-1)">−</button><b>${i.qty}</b><button onclick="changeQty('${i.id}',1)">＋</button></div></div>`;
+      })
+      .join("") || '<div class="empty">Escanee o agregue productos.</div>';
+  let x = calculateSale();
+  $("#totals").innerHTML =
+    `<div><span>Subtotal comercial</span><b>${money(x.gross)}</b></div><div><span>Descuento</span><b>-${money(x.discount)}</b></div><div><span>Base gravable estimada</span><b>${money(x.base)}</b></div><div><span>IVA incluido</span><b>${money(x.tax)}</b></div><div><span>ICA informativo (${db.settings.icaRate}%)</span><b>${money(x.ica)}</b></div><div class="grand"><span>Total a pagar</span><b>${money(x.total)}</b></div>`;
+};
+checkout = function () {
+  if (!can("pos", "create")) return toast("No tiene permiso para facturar");
+  let c = openCashSession();
+  if (!c) return toast("Debe abrir caja antes de vender");
+  if (db.sessionState !== "Activo") return toast("El turno no está activo");
+  if (cashBlocked())
+    return toast("Caja bloqueada: solicite retiro de efectivo");
+  if (!db.cart.length) return toast("El carrito está vacío");
+  let x = calculateSale(),
+    payment = $("#payment").value;
+  if (
+    payment === "Efectivo" &&
+    cashOnHand(c) + x.total > Number(db.settings.cashMax || 800000)
+  ) {
+    db.sessionState = "Bloqueada por efectivo";
+    notifyAdmins(
+      "Caja bloqueada por tope",
+      `${user().name} en ${store().name} requiere retiro. Efectivo proyectado: ${money(cashOnHand(c) + x.total)}`,
+      "danger",
+      { cashSession: c.id },
+    );
+    save();
+    updateSession();
+    renderPOS();
+    return toast("La venta superaría el tope. Se notificó al administrador");
+  }
+  $("#loaderText").textContent =
+    "Generando factura, calculando impuestos y actualizando inventario…";
+  $("#loader").classList.add("show");
+  setTimeout(() => {
+    let invoice =
+        db.settings.invoicePrefix +
+        "-" +
+        String(db.settings.nextInvoice++).padStart(6, "0"),
+      date = now(),
+      items = db.cart.map((i) => {
+        let p = db.products.find((x) => x.id === i.id),
+          before = p.stock,
+          line = p.price * i.qty * (1 - x.discountPct / 100),
+          tax = line - line / (1 + (p.tax || 0) / 100);
+        p.stock -= i.qty;
+        db.movements.push({
+          id: uid("m"),
+          date,
+          store: db.currentStore,
+          product: p.id,
+          productName: p.name,
+          type: "Venta",
+          qty: i.qty,
+          before,
+          after: p.stock,
+          user: user().id,
+          userName: user().name,
+          ref: invoice,
+        });
+        return {
+          product: p.id,
+          name: p.name,
+          ean: p.ean,
+          qty: i.qty,
+          price: p.price,
+          taxRate: p.tax,
+          tax,
+          total: p.price * i.qty,
+        };
+      }),
+      sale = {
+        id: uid("sale"),
+        invoice,
+        date,
+        store: db.currentStore,
+        user: user().id,
+        userName: user().name,
+        customer: $("#customer").value || "Consumidor final",
+        payment,
+        subtotal: x.gross,
+        discount: x.discount,
+        base: x.base,
+        tax: x.tax,
+        ica: x.ica,
+        total: x.total,
+        items,
+      };
+    db.sales.push(sale);
+    db.invoices.push({
+      ...sale,
+      status: "Emitida",
+      cufe: "CUFE-" + cryptoRandom(40),
+    });
+    save();
+    $("#loader").classList.remove("show");
+    showInvoice(sale.id);
+  }, 850);
+};
+showInvoice = function (id) {
+  let s = db.sales.find((x) => x.id === id),
+    st = db.stores.find((x) => x.id === s.store),
+    inv = db.invoices.find((i) => i.id === s.id);
+  openModal(
+    `Factura ${s.invoice}`,
+    `<div class="invoice-sheet"><div class="invoice-head"><div><div style="display:flex;align-items:center;gap:10px"><div class="logo" style="width:48px;height:48px">🛒</div><div><h2 style="margin:0">${db.settings.name}</h2><div>NIT ${db.settings.nit}</div></div></div><div>${st.name} · ${st.address}</div><div>${db.settings.phone} · ${db.settings.email}</div></div><div style="text-align:right"><b>FACTURA DE VENTA</b><div class="mono">${s.invoice}</div><div>${new Date(s.date).toLocaleString("es-CO")}</div></div></div><div class="grid two"><div><b>Cliente</b><div>${s.customer}</div></div><div><b>Cajero / sede</b><div>${s.userName} · ${st.name}</div></div></div><div class="tablewrap" style="margin-top:16px"><table style="min-width:0"><thead><tr><th>Producto</th><th>EAN</th><th>Cant.</th><th>IVA</th><th>Precio</th><th>Total</th></tr></thead><tbody>${s.items.map((i) => `<tr><td>${i.name}</td><td class="mono">${i.ean}</td><td>${i.qty}</td><td>${i.taxRate ?? i.tax}%</td><td>${money(i.price)}</td><td>${money(i.total)}</td></tr>`).join("")}</tbody></table></div><div style="margin:18px 0 0 auto;max-width:360px"><div class="totals"><div><span>Subtotal</span><b>${money(s.subtotal)}</b></div><div><span>Descuento</span><b>-${money(s.discount)}</b></div><div><span>Base gravable estimada</span><b>${money(s.base || 0)}</b></div><div><span>IVA incluido</span><b>${money(s.tax || 0)}</b></div><div><span>ICA informativo</span><b>${money(s.ica || 0)}</b></div><div class="grand"><span>Total</span><b>${money(s.total)}</b></div><div><span>Medio de pago</span><b>${s.payment}</b></div></div></div><div class="muted" style="margin-top:20px">${db.settings.invoiceNote}<br>CUFE interno: ${inv?.cufe || "—"}</div><div class="modalfoot no-print"><button class="btn outline" onclick="closeModal()">Cerrar</button><button class="btn primary" onclick="printInvoiceAndNext()">Imprimir y siguiente cliente</button></div></div>`,
+    true,
+  );
+};
+function printInvoiceAndNext() {
+  window.print();
+  db.cart = [];
+  save();
+  closeModal();
+  go("pos");
+  let b = $("#nextCustomerBanner");
+  if (b) {
+    b.classList.remove("hidden");
+    setTimeout(() => b.classList.add("hidden"), 5000);
+  }
+  toast("Factura impresa. Listo para el siguiente cliente");
+}
+renderTransfers = function () {
+  let ts = (
+    isAdmin()
+      ? db.transfers
+      : db.transfers.filter((t) => [t.from, t.to].includes(db.currentStore))
+  )
+    .slice()
+    .reverse();
+  $("#content").innerHTML =
+    `<div class="grid stats">${stat(ts.filter((t) => t.status === "Pendiente").length, "Pendientes", "Requieren decisión")}${stat(ts.filter((t) => t.status === "Aprobada").length, "Aprobadas", "Pendientes de recepción")}${stat(ts.filter((t) => t.status === "Recibida").length, "Recibidas", "Inventario actualizado")}${stat(ts.filter((t) => t.status === "Rechazada").length, "Rechazadas", "Con trazabilidad")}${stat(db.stores.length, "Sucursales", "Red operativa")}${stat(myNotifications().filter((n) => !n.read).length, "Mensajes nuevos", "Bandeja personal")}</div><div class="card section"><div class="head"><div><h3>Bandeja de transferencias</h3><p>El administrador visualiza todas las solicitudes de la red.</p></div>${can("transfers", "create") ? '<button class="btn primary" onclick="openTransfer()">＋ Solicitar traslado</button>' : ""}</div><div class="tablewrap"><table><thead><tr><th>Solicitud</th><th>Fecha</th><th>Origen</th><th>Destino</th><th>Producto</th><th>Cantidad</th><th>Solicitante</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>${ts.map((t) => `<tr><td class="mono">${t.code}</td><td>${new Date(t.date).toLocaleString("es-CO")}</td><td>${db.stores.find((s) => s.id === t.from)?.name}</td><td>${db.stores.find((s) => s.id === t.to)?.name}</td><td>${t.productName}</td><td>${t.qty}</td><td>${t.requestedBy}</td><td><span class="badge ${t.status === "Aprobada" ? "ok" : t.status === "Rechazada" ? "out" : t.status === "Recibida" ? "info" : "low"}">${t.status}</span></td><td><div class="actions">${t.status === "Pendiente" && isAdmin() ? `<button class="btn sm primary" onclick="approveTransfer('${t.id}',true)">Aprobar</button><button class="btn sm danger" onclick="approveTransfer('${t.id}',false)">Rechazar</button>` : ""}${t.status === "Aprobada" && (t.to === db.currentStore || isAdmin()) ? `<button class="btn sm info" onclick="receiveTransfer('${t.id}')">Confirmar recepción</button>` : ""}</div></td></tr>`).join("") || '<tr><td colspan="9">Sin solicitudes.</td></tr>'}</tbody></table></div></div>`;
+};
+const _saveTransfer = saveTransfer;
+saveTransfer = function (e) {
+  e.preventDefault();
+  let f = Object.fromEntries(new FormData(e.target)),
+    p = db.products.find((x) => x.id === f.product),
+    qty = Number(f.qty);
+  if (qty > p.stock) return toast("Cantidad superior al stock disponible");
+  let t = {
+    id: uid("t"),
+    code: "TR-" + Date.now().toString().slice(-7),
+    date: now(),
+    from: db.currentStore,
+    to: f.to,
+    product: p.id,
+    productName: p.name,
+    ean: p.ean,
+    qty,
+    reason: f.reason,
+    requestedBy: user().name,
+    requestedById: user().id,
+    status: "Pendiente",
+  };
+  db.transfers.push(t);
+  notifyAdmins(
+    "Nueva transferencia pendiente",
+    `${t.code}: ${t.productName} x ${t.qty}, de ${store().name} hacia ${db.stores.find((s) => s.id === t.to).name}`,
+    "warning",
+    { transfer: t.id },
+  );
+  closeModal();
+  renderTransfers();
+  toast("Solicitud enviada a la bandeja del administrador");
+};
+approveTransfer = function (id, ok) {
+  if (!isAdmin())
+    return toast("Solo el administrador puede aprobar transferencias");
+  let t = db.transfers.find((x) => x.id === id);
+  t.status = ok ? "Aprobada" : "Rechazada";
+  t.approvedBy = user().name;
+  t.approvedAt = now();
+  db.notifications.push({
+    id: uid("n"),
+    user: t.requestedById,
+    date: now(),
+    title: `Transferencia ${t.status.toLowerCase()}`,
+    text: `${t.code} fue ${t.status.toLowerCase()} por ${user().name}`,
+    type: ok ? "info" : "danger",
+    read: false,
+    transfer: t.id,
+  });
+  save();
+  renderTransfers();
+  toast(ok ? "Transferencia aprobada" : "Transferencia rechazada");
+};
+renderCash = function () {
+  let c = openCashSession(),
+    sales = shiftSales(c),
+    expected = c ? cashOnHand(c) : 0,
+    blocked = cashBlocked();
+  $("#content").innerHTML =
+    `${blocked ? `<div class="alertbox danger"><b>Bloqueo automático activo:</b> el efectivo estimado alcanzó ${money(expected)} y supera el tope ${money(db.settings.cashMax)}.</div>` : ""}<div class="grid stats">${stat(c ? "Abierta" : "Cerrada", "Estado de caja", db.sessionState)}${stat(money(c?.base || 0), "Base de cambio", "Fondo inicial")}${stat(money(expected), "Efectivo en caja", "Base + ventas - retiros")}${stat(money(cashWithdrawn(c)), "Retiros aprobados", "Custodia / tesorería")}${stat(sales.length, "Transacciones", "Turno actual")}${stat(money(db.settings.cashMax), "Tope de seguridad", "Bloqueo automático")}</div><div class="grid two"><div class="card section"><div class="head"><div><h3>Turno y arqueo</h3><p>Control profesional de caja y base de cambio</p></div></div>${c ? `<div class="alertbox info"><b>Apertura:</b> ${new Date(c.opened).toLocaleString("es-CO")}<br><b>Base:</b> ${money(c.base)} · <b>Estado:</b> ${db.sessionState}</div><div class="grid three"><button class="btn warn" onclick="setSession('Almuerzo')">Almuerzo</button><button class="btn light" onclick="setSession('Pausa')">Pausa</button><button class="btn purple" onclick="changeShift()">Cambio de turno</button></div><div class="grid two" style="margin-top:10px"><button class="btn info" onclick="requestWithdrawal()">Solicitar retiro</button><button class="btn primary" onclick="setSession('Activo')">Reanudar</button></div><button class="btn danger full" style="margin-top:12px" onclick="closeCash()">Cerrar, arquear y salir</button>` : `<div class="empty">Caja cerrada. Registre la base de cambio para iniciar.</div><button class="btn primary full" style="margin-top:12px" onclick="openCash()">Abrir caja</button>`}</div><div class="card section"><div class="head"><div><h3>Retiros de efectivo</h3><p>Solicitudes y aprobaciones</p></div></div><div class="list">${
+      db.cashWithdrawals
+        .filter(
+          (w) =>
+            isAdmin() ||
+            w.user === db.currentUser ||
+            w.store === db.currentStore,
+        )
+        .slice()
+        .reverse()
+        .map(
+          (w) =>
+            `<div class="listitem"><div class="grow"><strong>${money(w.amount)} · ${w.status}</strong><span>${w.userName} · ${new Date(w.date).toLocaleString("es-CO")} · ${w.reason}</span></div>${w.status === "Pendiente" && isSupervisor() ? `<button class="btn sm primary" onclick="approveWithdrawal('${w.id}',true)">Aprobar</button><button class="btn sm danger" onclick="approveWithdrawal('${w.id}',false)">Rechazar</button>` : ""}</div>`,
+        )
+        .join("") || '<div class="empty">Sin retiros.</div>'
+    }</div></div>`;
+};
+openCash = function () {
+  openModal(
+    "Apertura y base de cambio",
+    `<form onsubmit="saveOpenCash(event)"><div class="alertbox info">Cuente y registre billetes, monedas y fondo inicial antes de iniciar ventas.</div><div class="grid formgrid"><div class="field"><label>Base total</label><input name="base" type="number" min="0" required value="150000"></div><div class="field"><label>Billetes / monedas verificados</label><select name="verified"><option value="true">Sí, arqueados</option></select></div><div class="field fullspan"><label>Observación de apertura</label><textarea name="note" placeholder="Novedades de la base de cambio"></textarea></div></div><div class="modalfoot"><button class="btn primary">Abrir caja</button></div></form>`,
+  );
+};
+saveOpenCash = function (e) {
+  e.preventDefault();
+  let f = Object.fromEntries(new FormData(e.target));
+  db.cashSessions.push({
+    id: uid("c"),
+    user: db.currentUser,
+    userName: user().name,
+    store: db.currentStore,
+    opened: now(),
+    base: Number(f.base),
+    openingNote: f.note,
+    verified: true,
+    closed: null,
+  });
+  db.sessionState = "Activo";
+  db.shiftEvents.push({
+    id: uid("se"),
+    date: now(),
+    user: db.currentUser,
+    type: "Apertura",
+    store: db.currentStore,
+  });
+  save();
+  closeModal();
+  renderCash();
+  updateSession();
+  toast("Caja abierta y base de cambio registrada");
+};
+function requestWithdrawal() {
+  let c = openCashSession();
+  if (!c) return toast("No hay caja abierta");
+  openModal(
+    "Solicitar retiro de efectivo",
+    `<form onsubmit="saveWithdrawal(event,'${c.id}')"><div class="alertbox info">Efectivo estimado en caja: <b>${money(cashOnHand(c))}</b></div><div class="field"><label>Valor a retirar</label><input name="amount" type="number" min="10000" max="${cashOnHand(c)}" required></div><div class="field"><label>Motivo / destino</label><input name="reason" required value="Retiro preventivo por seguridad"></div><div class="modalfoot"><button class="btn primary">Enviar a aprobación</button></div></form>`,
+  );
+}
+function saveWithdrawal(e, cid) {
+  e.preventDefault();
+  let f = Object.fromEntries(new FormData(e.target)),
+    w = {
+      id: uid("w"),
+      cashSession: cid,
+      user: db.currentUser,
+      userName: user().name,
+      store: db.currentStore,
+      date: now(),
+      amount: Number(f.amount),
+      reason: f.reason,
+      status: "Pendiente",
+    };
+  db.cashWithdrawals.push(w);
+  notifyAdmins(
+    "Retiro de efectivo pendiente",
+    `${user().name} solicita ${money(w.amount)} en ${store().name}`,
+    "danger",
+    { withdrawal: w.id },
+  );
+  closeModal();
+  renderCash();
+  toast("Solicitud enviada al supervisor/administrador");
+}
+function approveWithdrawal(id, ok) {
+  if (!isSupervisor()) return toast("No autorizado");
+  let w = db.cashWithdrawals.find((x) => x.id === id);
+  w.status = ok ? "Aprobado" : "Rechazado";
+  w.approvedBy = user().name;
+  w.approvedAt = now();
+  if (ok && db.sessionState === "Bloqueada por efectivo")
+    db.sessionState = "Activo";
+  db.notifications.push({
+    id: uid("n"),
+    user: w.user,
+    date: now(),
+    title: `Retiro ${w.status.toLowerCase()}`,
+    text: `${money(w.amount)} · ${w.approvedBy}`,
+    type: ok ? "info" : "danger",
+    read: false,
+  });
+  save();
+  renderCash();
+  updateSession();
+  toast(`Retiro ${w.status.toLowerCase()}`);
+}
+setSession = function (s) {
+  if (s === "Cambio de turno") return changeShift();
+  db.sessionState = s;
+  db.shiftEvents.push({
+    id: uid("se"),
+    date: now(),
+    user: db.currentUser,
+    type: s,
+    store: db.currentStore,
+  });
+  save();
+  updateSession();
+  renderCash();
+  toast("Estado cambiado a " + s);
+};
+function changeShift() {
+  if (!openCashSession()) return logout();
+  if (
+    !confirm(
+      "El cambio de turno cerrará la caja actual y la sesión. ¿Continuar?",
+    )
+  )
+    return;
+  closeCash(true);
+}
+closeCash = function (forShift = false) {
+  let c = openCashSession();
+  if (!c) return toast("No hay caja abierta");
+  let expected = cashOnHand(c);
+  openModal(
+    forShift ? "Arqueo para cambio de turno" : "Arqueo y cierre de caja",
+    `<form onsubmit="saveCloseCashV9(event,'${c.id}',${expected},${forShift})"><div class="alertbox info">Efectivo esperado después de retiros: <b>${money(expected)}</b></div><div class="grid formgrid"><div class="field"><label>Efectivo contado</label><input name="counted" type="number" required></div><div class="field"><label>Base entregada al siguiente turno</label><input name="nextBase" type="number" min="0" value="0"></div><div class="field fullspan"><label>Observación / novedades</label><textarea name="note" required></textarea></div></div><div class="modalfoot"><button class="btn danger">Cerrar caja y sesión</button></div></form>`,
+  );
+};
+function saveCloseCashV9(e, id, expected, forShift) {
+  e.preventDefault();
+  let c = db.cashSessions.find((x) => x.id === id),
+    f = Object.fromEntries(new FormData(e.target));
+  c.closed = now();
+  c.counted = Number(f.counted);
+  c.expected = expected;
+  c.diff = c.counted - expected;
+  c.nextBase = Number(f.nextBase);
+  c.note = f.note;
+  c.closedBy = user().name;
+  db.sessionState = "Cerrado";
+  db.shiftEvents.push({
+    id: uid("se"),
+    date: now(),
+    user: db.currentUser,
+    type: forShift ? "Cambio de turno" : "Cierre",
+    store: db.currentStore,
+    note: f.note,
+  });
+  if (Math.abs(c.diff) >= 20000) {
+    db.audit.push({
+      id: uid("a"),
+      date: now(),
+      store: db.currentStore,
+      product: null,
+      productName: "Caja",
+      expected,
+      physical: c.counted,
+      diff: c.diff,
+      risk: "Alto",
+      resolved: false,
+      userName: user().name,
+      note: "Diferencia significativa en arqueo",
+    });
+    notifyAdmins(
+      "Diferencia de caja detectada",
+      `${user().name}: diferencia ${money(c.diff)} en ${store().name}`,
+      "danger",
+    );
+  }
+  save();
+  closeModal();
+  toast("Caja cerrada. Sesión finalizada");
+  setTimeout(logout, 500);
+}
+const _renderBranches = renderBranches;
+renderBranches = function () {
+  _renderBranches();
+  let c = document.querySelector("#content .card.section");
+  if (c)
+    c.insertAdjacentHTML(
+      "afterbegin",
+      `<div class="alertbox info"><b>Administración de red:</b> cree nuevas sedes, asigne usuarios y controle inventario cruzado. Las sedes nuevas quedan disponibles para permisos y transferencias.</div>`,
+    );
+};
+const _saveBranch = saveBranch;
+saveBranch = function (e, id) {
+  e.preventDefault();
+  let f = Object.fromEntries(new FormData(e.target));
+  f.active = f.active === "true";
+  if (id)
+    Object.assign(
+      db.stores.find((s) => s.id === id),
+      f,
+    );
+  else {
+    let s = { id: uid("s"), ...f };
+    db.stores.push(s);
+    let a = db.users.find((u) => u.role === "Administrador");
+    if (a && !a.branches.includes(s.id)) a.branches.push(s.id);
+    notifyAdmins("Nueva sucursal creada", `${s.name} · ${s.city}`, "info");
+  }
+  save();
+  closeModal();
+  renderShell();
+  renderBranches();
+  toast("Sucursal guardada y habilitada en la red");
+};
+const _renderSettings = renderSettings;
+renderSettings = function () {
+  _renderSettings();
+  let card = document.querySelector("#content .card.section");
+  if (card) {
+    let grid = card.querySelector(".formgrid");
+    grid.insertAdjacentHTML(
+      "beforeend",
+      `<div class="field"><label>Tope máximo de efectivo por caja</label><input id="cfgCashMax" type="number" value="${db.settings.cashMax}"></div><div class="field"><label>Tarifa ICA informativa (%)</label><input id="cfgIca" type="number" step="0.001" value="${db.settings.icaRate}"></div><div class="field fullspan"><label>Mensaje al pie de factura</label><textarea id="cfgInvoiceNote">${db.settings.invoiceNote}</textarea></div>`,
+    );
+  }
+};
+const _saveSettings = saveSettings;
+saveSettings = function () {
+  _saveSettings();
+  db.settings.cashMax = Number($("#cfgCashMax")?.value || 800000);
+  db.settings.icaRate = Number($("#cfgIca")?.value || 0.414);
+  db.settings.invoiceNote = $("#cfgInvoiceNote")?.value || "";
+  save();
+  toast("Configuración empresarial guardada");
+};
+const _login = login;
+login = function (e) {
+  e.preventDefault();
+  let un = $("#loginUser").value.trim().toLowerCase(),
+    pw = $("#loginPass").value,
+    u = db.users.find(
+      (x) => x.username.toLowerCase() === un && x.password === pw,
+    );
+  if (!u) return toast("Credenciales incorrectas");
+  if (!u.active) return toast("Cuenta bloqueada por el administrador");
+  db.currentUser = u.id;
+  db.currentStore = u.branches.includes(u.store) ? u.store : u.branches[0];
+  db.sessionState = "Activo";
+  save();
+  $("#loaderText").textContent =
+    `Preparando el entorno de ${u.role}: permisos, sucursales y alertas…`;
+  $("#loader").classList.add("show");
+  setTimeout(() => {
+    $("#loader").classList.remove("show");
+    showApp();
+  }, 1100);
+};
+let lf = document.getElementById("loginForm");
+if (lf) {
+  let clone = lf.cloneNode(true);
+  lf.parentNode.replaceChild(clone, lf);
+  clone.addEventListener("submit", login);
+}
+
+if (db.currentUser && user()?.active) showApp();
